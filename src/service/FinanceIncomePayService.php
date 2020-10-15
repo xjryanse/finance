@@ -11,5 +11,16 @@ class FinanceIncomePayService
 
     protected static $mainModel;
     protected static $mainModelClass    = '\\xjryanse\\finance\\model\\FinanceIncomePay';
-
+    /**
+     * 新的支付记录
+     */
+    public static function newIncomePay( $incomeId, $money, $data = [])
+    {
+        $data['income_id']  = $incomeId;
+        $data['money']      = $money;
+        
+        $res = self::save( $data );
+        return $res;
+    }
+    
 }
