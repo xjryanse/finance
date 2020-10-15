@@ -2,14 +2,14 @@
 namespace xjryanse\finance\service;
 
 /**
- * 账户表
+ * 账户流水表
  */
-class FinanceAccountService
+class FinanceAccountLogService
 {
     use \xjryanse\traits\InstTrait;
     use \xjryanse\traits\MainModelTrait;
 
     protected static $mainModel;
-    protected static $mainModelClass    = '\\xjryanse\\finance\\model\\FinanceAccount';
+    protected static $mainModelClass    = '\\xjryanse\\finance\\model\\FinanceAccountLog';
 
 }
