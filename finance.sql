@@ -1,0 +1,20 @@
+CREATE TABLE `w_finance_account` (
+  `id` varchar(32) NOT NULL,
+  `app_id` varchar(32) DEFAULT '',
+  `company_id` varchar(32) DEFAULT '',
+  `account_name` varchar(100) DEFAULT NULL COMMENT '账户名称',
+  `account_type` varchar(32) DEFAULT NULL COMMENT '账户类型(cash：现金,wechat：微信，corporate：对公账，meituan：美团账户)',
+  `account_no` varchar(50) DEFAULT NULL COMMENT '账号',
+  `money` float(10,2) DEFAULT '0.00' COMMENT '账户余额',
+  `sort` int(11) DEFAULT '1000' COMMENT '排序',
+  `status` tinyint(1) DEFAULT '1' COMMENT '状态(0禁用,1启用)',
+  `has_used` tinyint(1) DEFAULT '0' COMMENT '有使用(0否,1是)',
+  `is_lock` tinyint(1) DEFAULT '0' COMMENT '锁定（0：未锁，1：已锁）',
+  `is_delete` tinyint(1) DEFAULT '0' COMMENT '锁定（0：未删，1：已删）',
+  `remark` text COMMENT '备注',
+  `creater` varchar(50) DEFAULT '' COMMENT '创建者，user表',
+  `updater` varchar(50) DEFAULT '' COMMENT '更新者，user表',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='财务账户表';
