@@ -3,7 +3,7 @@ namespace xjryanse\finance\logic;
 
 use xjryanse\finance\service\FinanceIncomeService;
 use xjryanse\finance\service\FinanceIncomePayService;
-
+use xjryanse\logic\SnowFlake;
 /**
  * 支付单逻辑
  */
@@ -32,6 +32,9 @@ class FinanceIncomePayLogic
         if( $incomeInfo['money'] != XJRYANSE_OP_TODO ){
             throw new Exception( '收款单' . $incomeId .'非待收款状态');
         }
+        //支付单号
+        $data['id']         = SnowFlake::generateParticle();
+        $data['income_pay_sn'] = "PAY".$data['id'];
         $data['user_id']    = $userId;
         $data['money']      = $money;
         $res = FinanceIncomePayService::save( $data );
