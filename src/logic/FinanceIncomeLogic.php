@@ -20,8 +20,9 @@ class FinanceIncomeLogic
         //校验事务
         FinanceIncomeService::checkTransaction();
         //生成收款单id和订单号
-        $data['id']         = SnowFlake::generateParticle();
-        $data['income_sn']  = $prefix . $data['id'];
+        $data['id']             = SnowFlake::generateParticle();
+        $data['income_sn']      = $prefix . $data['id'];
+        $data['income_status']  = XJRYANSE_OP_TODO;
         $res = FinanceIncomeService::save($data);
         //收款单对应的订单信息存储
         if(isset($data['orders'])){

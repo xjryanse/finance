@@ -34,10 +34,11 @@ class FinanceIncomePayLogic
             throw new Exception( '收款单' . $incomeId .'非待收款状态');
         }
         //支付单号
-        $data['id']         = SnowFlake::generateParticle();
-        $data['income_pay_sn'] = "PAY".$data['id'];
-        $data['user_id']    = $userId;
-        $data['money']      = $money;
+        $data['id']             = SnowFlake::generateParticle();
+        $data['income_pay_sn']  = "PAY".$data['id'];
+        $data['user_id']        = $userId;
+        $data['money']          = $money;
+        $data['income_status']  = XJRYANSE_OP_TODO;
         $res = FinanceIncomePayService::save( $data );
         return $res;
     }
