@@ -37,4 +37,10 @@ class FinanceIncomePayService
 
         return self::mainModel()->where('id',$this->uuid)->delete( );
     }
+    
+    public static function getBySn($sn)
+    {
+        $con[] = ['income_pay_sn','=',$sn];
+        return self::find( $con );
+    }
 }
