@@ -26,9 +26,10 @@ class FinanceIncomeLogic
         $res = FinanceIncomeService::save($data);
         //收款单对应的订单信息存储
         if(isset($data['orders'])){
-            foreach($data['orders'] as $v){
+            foreach( $data['orders'] as $v ){
                 $tmp = $v;
-                $tmp['income_id'] = $res['id'];
+                $tmp['income_id']       = $res['id'];
+                $tmp['income_status']   = XJRYANSE_OP_TODO;
                 //保存单条数据，TODO批量
                 FinanceIncomeOrderService::save($tmp);
             }
