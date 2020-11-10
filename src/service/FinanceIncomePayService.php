@@ -1,6 +1,7 @@
 <?php
 namespace xjryanse\finance\service;
 
+use Exception;
 /**
  * 收款记录表：用户支付
  */
@@ -23,4 +24,17 @@ class FinanceIncomePayService
         return $res;
     }
     
+    public function delete()
+    {
+        $info = $this->get(0);
+        if(!$info){
+            throw new Exception('记录不存在');
+        }
+        //特殊判断
+        if($info['income_status'] != XJRYANSE_OP_TODO ){
+            throw new Exception('非待收款状态不能操作');
+        }
+
+        return self::mainModel()->where('id',$this->uuid)->delete( );
+    }
 }
