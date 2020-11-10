@@ -45,7 +45,7 @@ class FinanceIncomeLogic
         //校验事务
         FinanceIncomeService::checkTransaction();
         //获取信息
-        $info = FinanceIncomeService::getInstance( $financeIncomeId )->get();
+        $info = FinanceIncomeService::getInstance( $financeIncomeId )->get(0);
         if( $info['income_status'] != XJRYANSE_OP_TODO ){
             throw new Exception('收款单'.$financeIncomeId.'非待付款状态，不可取消');
         }
@@ -71,7 +71,7 @@ class FinanceIncomeLogic
         //校验事务
         FinanceIncomeService::checkTransaction();
         //财务支付入账记录
-        $financeIncomePay = FinanceIncomePayService::getInstance( $financeIncomePayId )->get();
+        $financeIncomePay = FinanceIncomePayService::getInstance( $financeIncomePayId )->get(0);
         if(!$financeIncomePay){
             throw new Exception('支付单'.$financeIncomePayId.'不存在');
         }
@@ -80,7 +80,7 @@ class FinanceIncomeLogic
             throw new Exception( '支付单'. $financeIncomePayId .'非已收款状态' );
         }
         //收款单信息
-        $financeIncome = FinanceIncomeService::getInstance( $financeIncomePay['income_id'] )->get();
+        $financeIncome = FinanceIncomeService::getInstance( $financeIncomePay['income_id'] )->get(0);
         //金额匹配校验
         if( $financeIncomePay['money'] !=  $financeIncome['money'] ){
             throw new Exception( '支付单'. $financeIncomePayId .'与收款单'. $financeIncome['id'] . '金额不匹配' );

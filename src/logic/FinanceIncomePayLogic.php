@@ -23,7 +23,7 @@ class FinanceIncomePayLogic
         //校验事务
         FinanceIncomePayService::checkTransaction();
         //收款单信息
-        $incomeInfo     = FinanceIncomeService::getInstance( $incomeId )->get();
+        $incomeInfo     = FinanceIncomeService::getInstance( $incomeId )->get(0);
         if( !$incomeInfo ){
             throw new Exception( '收款单'.$incomeId.'不存在' );
         }
@@ -52,7 +52,7 @@ class FinanceIncomePayLogic
         //校验事务
         FinanceIncomePayService::checkTransaction();
         //支付单关闭
-        $financeIncomePay = FinanceIncomePayService::getInstance( $financeIncomePayId )->get();
+        $financeIncomePay = FinanceIncomePayService::getInstance( $financeIncomePayId )->get(0);
         if( !$financeIncomePay ){
             throw new Exception( '支付单'.$financeIncomePayId.'不存在' );
         }
@@ -72,7 +72,7 @@ class FinanceIncomePayLogic
         //校验事务
         FinanceIncomePayService::checkTransaction();
         //支付单关闭
-        $financeIncomePay = FinanceIncomePayService::getInstance( $financeIncomePayId )->get();        
+        $financeIncomePay = FinanceIncomePayService::getInstance( $financeIncomePayId )->get(0);
         if( !$financeIncomePay ){
             throw new Exception( '支付单'.$financeIncomePayId.'不存在' );
         }
