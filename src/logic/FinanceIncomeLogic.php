@@ -54,6 +54,12 @@ class FinanceIncomeLogic
         FinanceIncomeOrderService::mainModel()->where( $con )->delete();
         //删除收款单
         FinanceIncomeService::getInstance( $financeIncomeId )->delete();
+        //收款单取支付单
+        $incomePays = FinanceIncomePayService::lists( $con );
+        foreach( $incomePays as $v){
+            FinanceIncomePayService::getInstance( $v['id'] )->delete();
+        }
+        
         return true;
     }
     /**
