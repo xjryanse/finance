@@ -4,6 +4,7 @@ namespace xjryanse\finance\logic;
 use xjryanse\finance\service\FinanceIncomeService;
 use xjryanse\finance\service\FinanceIncomePayService;
 use xjryanse\logic\SnowFlake;
+use Exception;
 /**
  * 支付单逻辑
  */
