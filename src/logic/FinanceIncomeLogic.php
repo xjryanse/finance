@@ -40,7 +40,7 @@ class FinanceIncomeLogic
     /**
      * 取消收款单
      */
-    public function cancelIncome( $financeIncomeId )
+    public static function cancelIncome( $financeIncomeId )
     {
         //校验事务
         FinanceIncomeService::checkTransaction();
@@ -60,7 +60,7 @@ class FinanceIncomeLogic
      * 支付后入账
      * @param type $financeIncomePayId  支付单id
      */
-    public function afterPayDoIncome( $financeIncomePayId )
+    public static function afterPayDoIncome( $financeIncomePayId )
     {
         //校验事务
         FinanceIncomeService::checkTransaction();
