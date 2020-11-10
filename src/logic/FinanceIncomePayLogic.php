@@ -36,6 +36,7 @@ class FinanceIncomePayLogic
         //支付单号
         $data['id']             = SnowFlake::generateParticle();
         $data['income_pay_sn']  = "PAY".$data['id'];
+        $data['income_id']      = $incomeId;
         $data['user_id']        = $userId;
         $data['money']          = $money;
         $data['income_status']  = XJRYANSE_OP_TODO;
