@@ -30,7 +30,7 @@ class FinanceIncomePayLogic
         if( $incomeInfo['money'] != $money ){
             throw new Exception( '收款单'.$incomeId.'金额'.$incomeInfo['money'].'与申请支付金额'.$money .'不匹配');
         }
-        if( $incomeInfo['money'] != XJRYANSE_OP_TODO ){
+        if( $incomeInfo['income_status'] != XJRYANSE_OP_TODO ){
             throw new Exception( '收款单' . $incomeId .'非待收款状态');
         }
         //支付单号
