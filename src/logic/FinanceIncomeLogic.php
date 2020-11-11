@@ -31,6 +31,9 @@ class FinanceIncomeLogic
                 $tmp = $v;
                 $tmp['income_id']       = $res['id'];
                 $tmp['income_status']   = XJRYANSE_OP_TODO;
+                if(!isset($tmp['order_id']) || !$tmp['order_id']){
+                    throw new Exception('orders数组中，order_id必须');
+                }
                 //保存单条数据，TODO批量
                 FinanceIncomeOrderService::save($tmp);
             }
