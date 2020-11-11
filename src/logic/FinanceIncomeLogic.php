@@ -34,6 +34,10 @@ class FinanceIncomeLogic
                 if(!isset($tmp['order_id']) || !$tmp['order_id']){
                     throw new Exception('orders数组中，order_id必须');
                 }
+                //有传就行，特殊情况可以为0；
+                if(!isset($tmp['money'])){
+                    throw new Exception('orders数组中，money必须');
+                }
                 //保存单条数据，TODO批量
                 FinanceIncomeOrderService::save($tmp);
             }
