@@ -4,6 +4,7 @@ namespace xjryanse\finance\logic;
 use xjryanse\finance\service\FinanceIncomeService;
 use xjryanse\finance\service\FinanceIncomeOrderService;
 use xjryanse\finance\service\FinanceIncomePayService;
+use xjryanse\order\logic\OrderLogic;
 use xjryanse\logic\SnowFlake;
 use Exception;
 
@@ -94,6 +95,8 @@ class FinanceIncomeLogic
         foreach( $financeIncomeOrders as $incomeOrder ){
             //更新收款订单状态：待支付为已支付
             FinanceIncomeOrderService::getInstance( $incomeOrder['id'])->setFieldWithPreValCheck( 'income_status',XJRYANSE_OP_TODO,XJRYANSE_OP_FINISH );
+            //同步订单的收款金额信息
+            OrderLogic::financeSync( $incomeOrder['order_id'] );
         }
         return true;
     }
