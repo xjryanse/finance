@@ -17,5 +17,10 @@ class FinanceIncomeService
         $con[] = ['income_sn','=',$sn];
         return self::find( $con );
     }
+    
+    public static function snToId( $sn )
+    {
+        return Finance::where('finance_sn',$sn)->value('id');
+    }
 
 }

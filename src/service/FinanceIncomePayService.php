@@ -12,6 +12,21 @@ class FinanceIncomePayService
 
     protected static $mainModel;
     protected static $mainModelClass    = '\\xjryanse\\finance\\model\\FinanceIncomePay';
+    
+    public static function paySnToIncomeId( $sn )
+    {
+        return self::where('income_pay_sn',$sn)->value('income_id');
+    }
+    
+    /**
+     * 获取订单的支付单号
+     */
+    public static function incomeGetPaySn( $incomeId )
+    {
+        //TODO,状态判断
+        $con[] = ['income_id','=',$incomeId ]; 
+        return self::where( $con )->order('id desc')->value('income_pay_sn');
+    }    
     /**
      * 新的支付记录
      */
