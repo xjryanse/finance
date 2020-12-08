@@ -83,4 +83,11 @@ class FinanceIncomePayLogic
         $res = FinanceIncomePayService::getInstance( $financeIncomePayId )->setFieldWithPreValCheck('income_status',XJRYANSE_OP_TODO,XJRYANSE_OP_FINISH );
         return $res;
     }
+    /**
+     * 退款后做入账处理
+     */
+    public static function afterRefundDoIncome(  )
+    {
+        
+    }
 }

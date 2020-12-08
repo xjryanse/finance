@@ -38,4 +38,12 @@ class FinanceIncomeOrderService
         }
         return self::sum( $con, 'money' );
     }
+    /**
+     * 根据订单id，取收款单id数组
+     */
+    public static function columnIncomeIdByOrderId( $orderId ,$con = [])
+    {
+        $con[] = [ 'order_id', 'in', $orderId ];
+        return self::mainModel()->where( $con )->column('income_id');
+    }
 }

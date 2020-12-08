@@ -58,4 +58,13 @@ class FinanceIncomePayService
         $con[] = ['income_pay_sn','=',$sn];
         return self::find( $con );
     }
+    
+    /**
+     * 根据订单id，取收款单id数组
+     */
+    public static function columnIncomePaySnByIncomeId( $incomeId ,$con = [])
+    {
+        $con[] = [ 'income_id', 'in', $incomeId ];
+        return self::mainModel()->where( $con )->column('income_pay_sn');
+    }
 }
