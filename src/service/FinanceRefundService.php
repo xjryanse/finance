@@ -3,6 +3,8 @@ namespace xjryanse\finance\service;
 
 use xjryanse\logic\SnowFlake;
 use xjryanse\order\service\OrderService;
+use xjryanse\finance\service\FinanceIncomePayService;
+
 /**
  * 退款
  */
@@ -23,22 +25,32 @@ class FinanceRefundService
      * @param type $financeSn   支付单号
      * @return type
      */
-    public static function newRefund( $orderType,$orderSn,$orderPrize,$refundPrize,$financeSn,$refundFrom = 'wechat')
+    /**
+     * 
+     * @param type $orderId     订单id
+     * @param type $refundPrize 退款金额
+     * @param type $paySn       支付单号
+     * @param type $data        额外数据
+     * @return type
+     */
+    public static function newRefund( $orderId, $refundPrize, $paySn, $data=[])
     {
+        //【订单】
+        $orderInfo = OrderService::getInstance( $orderId )->get();
+        //订单类型
+        $data['order_type'] = isset($orderInfo['order_type']) ? $orderInfo['order_type'] : '';
+        //【支付单】
+        $payInfo = FinanceIncomePayService::getBySn( $paySn );
+        //订单类型
+        $data['income_id'] = isset($payInfo['income_id']) ? $payInfo['income_id'] : '';
+        $data['order_id']       = $orderId;     //订单id
+        $data['refund_prize']   = $refundPrize; //退款金额
+        $data['pay_sn']         = $paySn;       //支付单号
+        //生成收款单
         $data['id']             = SnowFlake::generateParticle();
         $data['company_id']     = session('scopeCompanyId');
-        $data['order_id']       = OrderService::snToId($orderSn);
-        $data['order_type']     = $orderType;
         $data['refund_sn']      = 'REF'.$data['id'];
-        $data['order_sn']       = $orderSn;
-        $data['order_prize']    = $orderPrize;
-        $data['refund_prize']   = $refundPrize;
-        $data['finance_sn']     = $financeSn;
-        $data['refund_from']    = $refundFrom;
-        //获取收款单id
-        $incomeId               = FinanceIncomeService::snToId( $financeSn );
-        //获取支付单号
-        $data['pay_sn']         = FinanceIncomePayService::incomeGetPaySn( $incomeId );
+        $data['refund_status']  = isset($data['refund_status']) ? $data['refund_status'] : XJRYANSE_OP_TODO;
         
         return self::save($data);
     }    
