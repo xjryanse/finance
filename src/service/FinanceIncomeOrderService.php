@@ -22,7 +22,9 @@ class FinanceIncomeOrderService
         if( $status ){
             $con[] = [ 'income_status', 'in', $status ];
         }
-        return self::sum( $con, 'money' );
+        $res = self::sum( $con, 'money' );
+        //四舍五入
+        return round( $res ,2);
     }
     
     /*

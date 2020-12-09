@@ -16,17 +16,24 @@ class FinanceRefundService
     protected static $mainModel;
     protected static $mainModelClass    = '\\xjryanse\\finance\\model\\FinanceRefund';
 
+    /*
+     * 获取订单费用
+     * @param type $orderId     订单id
+     * @param type $status      收款状态，默认已完成
+     */
+    public static function getOrderMoney( $orderId ,$status = XJRYANSE_OP_FINISH )
+    {
+        $con[] = ['order_id','=',$orderId ];
+        if( $status ){
+            $con[] = [ 'refund_status', 'in', $status ];
+        }
+        $res = self::sum( $con, 'refund_prize' );
+        //四舍五入
+        return round( $res ,2);
+    }    
+    
     /**
      * 新订单写入
-     * @param type $orderType   订单类型
-     * @param type $orderSn     订单号
-     * @param type $orderPrize  订单金额
-     * @param type $refundPrize 退款金额
-     * @param type $financeSn   支付单号
-     * @return type
-     */
-    /**
-     * 
      * @param type $orderId     订单id
      * @param type $refundPrize 退款金额
      * @param type $paySn       支付单号
