@@ -98,7 +98,7 @@ class FinanceRefundLogic
             $wxPayLog   = WechatWxPayLogService :: getByOutTradeNo( $info['pay_sn'] );
             $param      = [];
             //退款金额
-            $refundFee  = $wxPayLog['total_fee'];
+            $refundFee  = (int) ($info['refund_prize'] * 100);
             $param["out_refund_no"] = SnowFlake::generateParticle();    //退款单号
             $param["out_trade_no"]  = $wxPayLog['out_trade_no'];        //原支付订单号
             $param["total_fee"]     = $wxPayLog['total_fee'];           //订单总额（分）
