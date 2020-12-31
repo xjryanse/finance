@@ -2,6 +2,7 @@
 
 namespace xjryanse\finance\service;
 
+use Exception;
 /**
  * 账户表
  */
@@ -12,6 +13,51 @@ class FinanceAccountService {
 
     protected static $mainModel;
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceAccount';
+    
+    /*
+     * 用户id和账户类型创建，一个类型只能有一个账户
+     */
+    public static function createAccount( $accountType ,$data = [])
+    {
+        $con[] = ['account_type','=',$accountType];
+        $data['account_type']   = $accountType;
+        return self::count($con) ? false : self::save( $data );
+    }
+    /**
+     * 根据账户类型取id
+     * @param type $companyId   公司id
+     * @param type $accountType 账户类型
+     * @return type
+     */
+    public static function getIdByAccountType( $companyId, $accountType )
+    {
+        $con[] = ['company_id','=',$companyId];
+        $con[] = ['account_type','=',$accountType];
+
+        $info = self::find( $con );
+        if(!$info){
+            $info = self::createAccount($accountType);
+        }
+        return $info ? $info['id'] : '';
+    }
+    
+    /**
+     * 入账更新
+     */
+    public function income( $value ) {
+        self::checkTransaction();
+        //账户余额更新
+        return self::mainModel()->where('id', $this->uuid)->setInc('money', $value);
+    }    
+    
+    /**
+     * 资金出账更新
+     */
+    public function outcome($value) {
+        self::checkTransaction();
+        //账户余额更新
+        return self::mainModel()->where('id', $this->uuid)->setDec('money', $value);
+    }    
 
     /**
      *

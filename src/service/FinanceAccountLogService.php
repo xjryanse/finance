@@ -13,6 +13,34 @@ class FinanceAccountLogService {
     protected static $mainModel;
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceAccountLog';
 
+    public static function save(array $data) {
+        //执行保存后
+        $res = self::commSave($data);
+        //账户余额更新
+        if( isset($res['account_id']) && $res['account_id'] ){
+            $con[] = ['account_id','=',$res['account_id']];
+            $money = self::sum($con, 'money');
+            FinanceAccountService::getInstance($res['account_id'])->setField( 'money',$money);
+        }
+        return $res;
+    }
+    
+    /**
+     * 来源表和来源id查是否有记录：
+     * 一般用于判断该笔记录是否已入账，避免重复入账
+     * @param type $fromTable   来源表
+     * @param type $fromTableId 来源表id
+     */
+    public static function hasLog( $fromTable, $fromTableId )
+    {
+        //`from_table` varchar(255) DEFAULT '' COMMENT '来源表',
+        //`from_table_id` varchar(32) DEFAULT '' COMMENT '来源表id',
+        $con[] = ['from_table','=',$fromTable];
+        $con[] = ['from_table_id','=',$fromTableId];
+        
+        return self::count($con) ? true : false;
+    }
+    
     /**
      *
      */

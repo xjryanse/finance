@@ -12,7 +12,7 @@ class FinanceIncomeOrderService {
 
     protected static $mainModel;
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceIncomeOrder';
-
+    
     /*
      * 获取订单费用
      * @param type $orderId     订单id

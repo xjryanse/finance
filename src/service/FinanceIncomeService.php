@@ -2,6 +2,7 @@
 
 namespace xjryanse\finance\service;
 
+use Exception;
 /**
  * 收款单
  */
@@ -12,6 +13,33 @@ class FinanceIncomeService {
 
     protected static $mainModel;
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceIncome';
+    
+    public function delete()
+    {
+        //多表删除需事务
+        self::checkTransaction();
+        //执行主表删除
+        $res = $this->commDelete();
+        //删除收款关联订单
+        $con[] = ['income_id','=',$this->uuid];
+        $lists = FinanceIncomeOrderService::lists( $con );
+        foreach( $lists as $key=>$value){
+            if( $value['income_status'] == XJRYANSE_OP_FINISH){
+                throw new Exception('收款单对应订单已完成收款，收款单不可删除。记录id：'.$value['id']);
+            }
+            //删除
+            FinanceIncomeOrderService::getInstance( $value['id'] )->delete();
+        }
+        
+        //删除支付单
+        $incomePays = FinanceIncomePayService::lists( $con );
+        foreach( $incomePays as $v){
+            FinanceIncomePayService::getInstance( $v['id'] )->delete();
+        }
+
+        return $res;
+    }    
+    
 
     public static function getBySn($sn) {
         $con[] = ['income_sn', '=', $sn];
