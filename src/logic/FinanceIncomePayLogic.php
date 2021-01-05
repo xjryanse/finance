@@ -49,19 +49,7 @@ class FinanceIncomePayLogic
      */
     public static function cancelPay( $financeIncomePayId )
     {
-        //校验事务
-        FinanceIncomePayService::checkTransaction();
-        //支付单关闭
-        $financeIncomePay = FinanceIncomePayService::getInstance( $financeIncomePayId )->get(0);
-        if( !$financeIncomePay ){
-            throw new Exception( '支付单'.$financeIncomePayId.'不存在' );
-        }
-        if( $financeIncomePay['income_status'] != XJRYANSE_OP_TODO ){
-            throw new Exception( '支付单'.$financeIncomePayId.'非待收款状态不能操作' );
-        }
-        //支付单更新为已关闭状态
-        $res = FinanceIncomePayService::getInstance( $financeIncomePayId )->setFieldWithPreValCheck('income_status',XJRYANSE_OP_TODO,XJRYANSE_OP_CLOSE );
-        return $res;
+        return FinanceIncomePayService::getInstance( $financeIncomePayId )->cancelPay();
     }
     /**
      * 支付后入账
@@ -69,25 +57,6 @@ class FinanceIncomePayLogic
      */
     public static function afterPayDoIncome( $financeIncomePayId )
     {
-        //校验事务
-        FinanceIncomePayService::checkTransaction();
-        //支付单关闭
-        $financeIncomePay = FinanceIncomePayService::getInstance( $financeIncomePayId )->get(0);
-        if( !$financeIncomePay ){
-            throw new Exception( '支付单'.$financeIncomePayId.'不存在' );
-        }
-        if( $financeIncomePay['income_status'] != XJRYANSE_OP_TODO ){
-            throw new Exception( '支付单'.$financeIncomePayId.'非待收款状态不能操作' );
-        }
-        //支付单更新为已完成
-        $res = FinanceIncomePayService::getInstance( $financeIncomePayId )->setFieldWithPreValCheck('income_status',XJRYANSE_OP_TODO,XJRYANSE_OP_FINISH );
-        return $res;
-    }
-    /**
-     * 退款后做入账处理
-     */
-    public static function afterRefundDoIncome(  )
-    {
-        
+        return FinanceIncomePayService::getInstance( $financeIncomePayId )->afterPayDoIncome();
     }
 }

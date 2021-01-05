@@ -134,15 +134,8 @@ class FinanceIncomeLogic
         }
         $incomePays         = FinanceIncomePayService::lists( $con );
         foreach( $incomePays as $incomePay){
-            $logData    = [];
-            $logData['reason']          = $incomePay['describe'];
-            $logData['from_table']      = FinanceIncomePayService::mainModel()->getTable();
-            $logData['from_table_id']   = $incomePay['id'];
-            $logData['user_id']         = $incomePay['user_id'];            
-            //收款单入账
-            FinanceAccountLogic::doIncome($incomePay['company_id'], $incomePay['pay_by'], $incomePay['money'] ,$logData);
-            //设定入账状态为已入账
-            FinanceIncomePayService::getInstance( $incomePay['id'] )->setField( 'into_account',1 );
+            //每个支付单单独入账
+            FinanceIncomePayService::getInstance( $incomePay['id'] )->intoAccount();
         }
 
         $data['into_account']           = 1;

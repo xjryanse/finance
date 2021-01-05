@@ -38,7 +38,7 @@ class FinanceAccountLogService {
         $con[] = ['from_table','=',$fromTable];
         $con[] = ['from_table_id','=',$fromTableId];
         
-        return self::count($con) ? true : false;
+        return self::count($con) ? self::find( $con ) : false;
     }
     
     /**

@@ -24,6 +24,14 @@ class FinanceAccountLogic implements AccountLogicInterface
     {
         //事务校验
         FinanceAccountService::checkTransaction();
+        $fromTable      = isset($data['from_table'])    && $data['from_table']      ? $data['from_table']       : '';
+        $fromTableId    = isset($data['from_table_id']) && $data['from_table_id']   ? $data['from_table_id']    : '';
+        
+        if($fromTable && $fromTableId 
+                && FinanceAccountLogService::hasLog( $fromTable, $fromTableId ) ){
+            throw new Exception( $fromTable . $fromTableId .'已经入账过了');
+        }
+
         //账户id
         $accountId  = FinanceAccountService::getIdByAccountType($companyId, $accountType );
 

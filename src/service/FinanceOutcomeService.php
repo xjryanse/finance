@@ -25,7 +25,7 @@ class FinanceOutcomeService {
         $lists = FinanceOutcomeOrderService::lists( $con );
         foreach( $lists as $key=>$value){
             if( $value['outcome_status'] == XJRYANSE_OP_FINISH){
-                throw new Exception('付款单对应订单已完成付款，收款单不可删除。记录id：'.$value['id']);
+                throw new Exception('付款单对应订单已完成付款，付款单不可删除。记录id：'.$value['id']);
             }
             //删除
             FinanceOutcomeOrderService::getInstance( $value['id'] )->delete();
