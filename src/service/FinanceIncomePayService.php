@@ -15,6 +15,16 @@ class FinanceIncomePayService {
 
     protected static $mainModel;
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceIncomePay';
+    
+    /**
+     * 根据收款单id获取支付来源
+     */
+    public static function columnPayByByIncomeId( $incomeId )
+    {
+        $con[] = ['income_id','=',$incomeId];
+        $con[] = ['income_status','=',XJRYANSE_OP_FINISH];
+        return self::column('distinct pay_by', $con);
+    }
     /*
      * 支付单转收款id
      */

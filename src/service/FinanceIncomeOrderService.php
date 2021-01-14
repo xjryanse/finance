@@ -13,6 +13,23 @@ class FinanceIncomeOrderService {
     protected static $mainModel;
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceIncomeOrder';
     
+    /**
+     * 更新
+     * @param array $data
+     * @return type
+     * @throws Exception
+     */
+    public function update( array $data )
+    {
+        $incomeId = isset($data['income_id']) 
+                ? $data['income_id'] 
+                : self::getInstance($this->uuid)->fIncomeId();
+        
+        $data['pay_by'] = FinanceIncomeService::getInstance($incomeId)->fieldValue('pay_by','',0);  //不拿缓存
+        //预保存数据
+        return $this->commUpdate($data);
+    }    
+    
     /*
      * 获取订单费用
      * @param type $orderId     订单id

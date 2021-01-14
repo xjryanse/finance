@@ -40,6 +40,19 @@ class FinanceIncomeService {
         return $res;
     }    
     
+    /**
+     * 更新
+     * @param array $data
+     * @return type
+     * @throws Exception
+     */
+    public function update( array $data )
+    {
+        $payBy = FinanceIncomePayService::columnPayByByIncomeId($this->uuid);
+        $data['pay_by'] = implode(',', $payBy); //支付来源
+        //预保存数据
+        return $this->commUpdate($data);
+    }
 
     public static function getBySn($sn) {
         $con[] = ['income_sn', '=', $sn];
@@ -123,7 +136,7 @@ class FinanceIncomeService {
     /**
      * 支付来源
      */
-    public function fPayFrom() {
+    public function fPayBy() {
         return $this->getFFieldValue(__FUNCTION__);
     }
 
