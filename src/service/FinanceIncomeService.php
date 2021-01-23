@@ -2,6 +2,8 @@
 
 namespace xjryanse\finance\service;
 
+use xjryanse\order\service\OrderService;
+use xjryanse\finance\service\FinanceIncomePayService;
 use Exception;
 /**
  * 收款单
@@ -39,6 +41,23 @@ class FinanceIncomeService {
 
         return $res;
     }    
+    /**
+     * 
+     * @param type $data
+     */
+    public static function save( $data )
+    {
+        $res = self::commSave($data);
+        if(isset($data['order_id'])){
+            $data['income_id'] = $res['id'];
+            FinanceIncomeOrderService::save($data);
+            //收款单
+            if(isset($data['income_status']) && $data['income_status'] == XJRYANSE_OP_FINISH){
+                FinanceIncomePayService::saveGetId($data);
+            }
+        }
+        return $res;
+    }
     
     /**
      * 更新

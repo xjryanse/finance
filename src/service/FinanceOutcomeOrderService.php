@@ -2,6 +2,7 @@
 
 namespace xjryanse\finance\service;
 
+use xjryanse\order\logic\OrderLogic;
 /**
  * 付款单-订单关联
  */
@@ -13,6 +14,52 @@ class FinanceOutcomeOrderService {
     protected static $mainModel;
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceOutcomeOrder';
 
+    /*
+     * 获取订单费用
+     * @param type $orderId     订单id
+     * @param type $status      收款状态，默认已完成
+     */
+    public static function getOrderMoney($orderId, $status = XJRYANSE_OP_FINISH) {
+        $con[] = ['order_id', '=', $orderId];
+        if ($status) {
+            $con[] = ['outcome_status', 'in', $status];
+        }
+        $res = self::sum($con, 'money');
+        //四舍五入
+        return round($res, 2);
+    }
+    
+    public static function save(array $data) {
+        $res = self::commSave($data);
+        if(isset($data['order_id'])){
+            OrderLogic::financeSync($data['order_id']);
+        }
+        return $res;
+    }
+    /**
+     * 更新
+     * @param array $data
+     * @return type
+     * @throws Exception
+     */
+    public function update( array $data )
+    {
+        $incomeId = isset($data['outcome_id']) 
+                ? $data['outcome_id'] 
+                : self::getInstance($this->uuid)->fIncomeId();
+        
+//        $data['pay_by'] = FinanceOutcomeService::getInstance($incomeId)->fieldValue('pay_by','',0);  //不拿缓存
+        if(isset($data['file_id'])){
+            FinanceIncomeService::getInstance($incomeId)->update(['file_id'=>$data['file_id']]);
+        }
+        
+        $orderId = $this->fOrderId();
+        OrderLogic::financeSync( $orderId );
+
+        //预保存数据
+        return $this->commUpdate($data);
+    }        
+    
     /**
      *
      */

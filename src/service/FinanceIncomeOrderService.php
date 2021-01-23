@@ -2,10 +2,13 @@
 
 namespace xjryanse\finance\service;
 
+use xjryanse\system\interfaces\ExtraDataInterface;
+use xjryanse\order\service\OrderService;
+use xjryanse\logic\Arrays;
 /**
  * 收款单-订单关联
  */
-class FinanceIncomeOrderService {
+class FinanceIncomeOrderService implements ExtraDataInterface{
 
     use \xjryanse\traits\InstTrait;
     use \xjryanse\traits\MainModelTrait;
@@ -13,23 +16,26 @@ class FinanceIncomeOrderService {
     protected static $mainModel;
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceIncomeOrder';
     
-    /**
-     * 更新
-     * @param array $data
-     * @return type
-     * @throws Exception
+        /**
+     * 额外输入信息
      */
-    public function update( array $data )
-    {
-        $incomeId = isset($data['income_id']) 
-                ? $data['income_id'] 
-                : self::getInstance($this->uuid)->fIncomeId();
+    public static function extraPreSave(&$data, $uuid) {
+        $info = self::getInstance($uuid)->get(0);
+        //TODO
+        if(isset($data['file_id'])){
+            FinanceIncomeService::getInstance( Arrays::value($info,'income_id')  )->update(['file_id'=>$data['file_id']]);
+        }
+        return $data;
+    }
+
+    /**
+     * 额外详情信息
+     */
+    public static function extraDetail(&$item, $uuid) {
+
+        return $item;
+    }
         
-        $data['pay_by'] = FinanceIncomeService::getInstance($incomeId)->fieldValue('pay_by','',0);  //不拿缓存
-        //预保存数据
-        return $this->commUpdate($data);
-    }    
-    
     /*
      * 获取订单费用
      * @param type $orderId     订单id

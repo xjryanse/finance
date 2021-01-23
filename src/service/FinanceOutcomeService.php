@@ -38,7 +38,25 @@ class FinanceOutcomeService {
         }
 
         return $res;
-    }        
+    }
+    
+    /**
+     * 
+     * @param type $data
+     */
+    public static function save( $data )
+    {
+        $res = self::commSave($data);
+        if(isset($data['order_id'])){
+            $data['outcome_id'] = $res['id'];
+            FinanceOutcomeOrderService::saveGetId($data);
+            //收款单
+            if(isset($data['outcome_status']) && $data['outcome_status'] == XJRYANSE_OP_FINISH){
+                FinanceIncomePayService::saveGetId($data);
+            }
+        }
+        return $res;
+    }
     
     /**
      *

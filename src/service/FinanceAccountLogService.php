@@ -12,18 +12,6 @@ class FinanceAccountLogService {
 
     protected static $mainModel;
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceAccountLog';
-
-    public static function save(array $data) {
-        //执行保存后
-        $res = self::commSave($data);
-        //账户余额更新
-        if( isset($res['account_id']) && $res['account_id'] ){
-            $con[] = ['account_id','=',$res['account_id']];
-            $money = self::sum($con, 'money');
-            FinanceAccountService::getInstance($res['account_id'])->setField( 'money',$money);
-        }
-        return $res;
-    }
     
     /**
      * 来源表和来源id查是否有记录：
