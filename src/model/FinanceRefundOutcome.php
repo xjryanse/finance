@@ -4,7 +4,7 @@ namespace xjryanse\finance\model;
 /**
  * 退款单
  */
-class FinanceRefund extends Base
+class FinanceRefundOutcome extends Base
 {
             /**
      * 用户头像图标

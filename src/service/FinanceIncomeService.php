@@ -70,7 +70,9 @@ class FinanceIncomeService {
         $payBy = FinanceIncomePayService::columnPayByByIncomeId($this->uuid);
         $data['pay_by'] = implode(',', $payBy); //支付来源
         //预保存数据
-        return $this->commUpdate($data);
+        if($this->get()){
+            return $this->commUpdate($data);
+        }
     }
 
     public static function getBySn($sn) {
