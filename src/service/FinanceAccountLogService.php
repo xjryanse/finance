@@ -2,6 +2,10 @@
 
 namespace xjryanse\finance\service;
 
+use xjryanse\logic\Arrays;
+use xjryanse\logic\DbOperate;
+use xjryanse\logic\DataCheck;
+use Exception;
 /**
  * 账户流水表
  */
@@ -13,6 +17,33 @@ class FinanceAccountLogService {
     protected static $mainModel;
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceAccountLog';
     
+    /**
+     * 额外输入信息
+     */
+    public static function extraPreSave(&$data, $uuid) {
+        DataCheck::must($data, ['from_table','from_table_id','money','account_id']);
+        $fromTable      = Arrays::value($data, 'from_table');
+        $fromTableId    = Arrays::value($data, 'from_table_id');
+        $service = DbOperate::getService( $fromTable );
+        if( $service::mainModel()->hasField('into_account')){
+            $info = $service::getInstance( $fromTableId )->get(0);
+            if( $info['into_account'] != 0){
+                throw new Exception('非待入账数据不可入账:'.$fromTable.'-'.$fromTableId);
+            }
+        }
+    }
+    
+    /**
+     * 额外输入信息
+     */
+    public static function extraAfterSave(&$data, $uuid) {
+        $fromTable      = Arrays::value($data, 'from_table');
+        $fromTableId    = Arrays::value($data, 'from_table_id');
+        if( $fromTable ){
+            $service = DbOperate::getService( $fromTable );
+            $service::getInstance( $fromTableId )->update( ['into_account'=>1]);    //来源表入账状态更新为已入账
+        }
+    }    
     /**
      * 来源表和来源id查是否有记录：
      * 一般用于判断该笔记录是否已入账，避免重复入账

@@ -23,5 +23,12 @@ class FinanceIncome extends Base
     public function setFileIdAttr($value) {
         return self::setImgVal($value);
     }
-
+    /**
+     * 入账时间
+     * @param type $value
+     * @return type
+     */
+    public function setIntoAccountTimeAttr($value) {
+        return $value && strtotime($value) > 0 ? $value : null;
+    }
 }

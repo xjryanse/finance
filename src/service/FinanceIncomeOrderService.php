@@ -3,8 +3,8 @@
 namespace xjryanse\finance\service;
 
 use xjryanse\system\interfaces\ExtraDataInterface;
-use xjryanse\order\service\OrderService;
 use xjryanse\logic\Arrays;
+
 /**
  * 收款单-订单关联
  */
@@ -16,7 +16,7 @@ class FinanceIncomeOrderService implements ExtraDataInterface{
     protected static $mainModel;
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceIncomeOrder';
     
-        /**
+    /**
      * 额外输入信息
      */
     public static function extraPreSave(&$data, $uuid) {
@@ -32,6 +32,7 @@ class FinanceIncomeOrderService implements ExtraDataInterface{
      * 额外详情信息
      */
     public static function extraDetail(&$item, $uuid) {
+        if(!$item){ return false;}
 
         return $item;
     }

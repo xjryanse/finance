@@ -90,13 +90,15 @@ class FinanceIncomeLogic
             throw new Exception( '支付单'. $financeIncomePayId .'与收款单'. $financeIncome['id'] . '金额不匹配' );
         }
         //更新收款单状态:待支付为已支付
-        FinanceIncomeService::getInstance( $financeIncomePay['income_id'])->setFieldWithPreValCheck( 'income_status',XJRYANSE_OP_TODO,XJRYANSE_OP_FINISH );
+//        FinanceIncomeService::getInstance( $financeIncomePay['income_id'])->setFieldWithPreValCheck( 'income_status',XJRYANSE_OP_TODO,XJRYANSE_OP_FINISH );
+        FinanceIncomeService::getInstance( $financeIncomePay['income_id'])->update( ['income_status'=>XJRYANSE_OP_FINISH ]);
         //收款单关联订单的信息
         $con1[] = ['income_id','=',$financeIncomePay['income_id']];
         $financeIncomeOrders = FinanceIncomeOrderService::lists( $con1 );
         foreach( $financeIncomeOrders as $incomeOrder ){
             //更新收款订单状态：待支付为已支付
-            FinanceIncomeOrderService::getInstance( $incomeOrder['id'])->setFieldWithPreValCheck( 'income_status',XJRYANSE_OP_TODO,XJRYANSE_OP_FINISH );
+//            FinanceIncomeOrderService::getInstance( $incomeOrder['id'])->setFieldWithPreValCheck( 'income_status',XJRYANSE_OP_TODO,XJRYANSE_OP_FINISH );
+            FinanceIncomeOrderService::getInstance( $incomeOrder['id'])->update( ['income_status'=>XJRYANSE_OP_FINISH ]);
             //同步订单的收款金额信息
             OrderLogic::financeSync( $incomeOrder['order_id'] );
         }

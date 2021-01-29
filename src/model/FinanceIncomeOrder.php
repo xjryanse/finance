@@ -23,4 +23,13 @@ class FinanceIncomeOrder extends Base
     public function setFileIdAttr($value) {
         return self::setImgVal($value);
     }
+    
+    /**
+     * @param type $value
+     * @throws \Exception
+     */
+    public function setIncomeTimeAttr($value) {
+        return $value && strtotime($value) > 0 ? $value : null;
+    }
+    
 }
