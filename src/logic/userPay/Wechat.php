@@ -28,8 +28,14 @@ class Wechat extends Base implements UserPayInterface
         DataCheck::must($thirdPayParam, ['wePubAppId','openid']);
         //校验必须
         $incomeInfo = FinanceIncomeService::getInstance( $incomeId )->get(0);
+        if(!$incomeInfo){
+            return false;
+        }
         //生成支付单
-        $pay = FinanceIncomePayLogic::newPay($incomeInfo['id'], $incomeInfo['money'], $incomeInfo['pay_user_id'], ['pay_by'=>FR_FINANCE_WECHAT]);
+        $data['order_id']   = Arrays::value($incomeInfo, 'order_id');
+        $data['pay_by']     = FR_FINANCE_MONEY;
+        //生成支付单
+        $pay = FinanceIncomePayLogic::newPay($incomeInfo['id'], $incomeInfo['money'], $incomeInfo['pay_user_id'], $data);
         //支付单
         $WxPayLogic         = new WxPayLogic($thirdPayParam['wePubAppId'], $thirdPayParam['openid'] );
         $attach             = ['finance_id'=>$incomeInfo['id']];  //收款单信息扔到附加数据

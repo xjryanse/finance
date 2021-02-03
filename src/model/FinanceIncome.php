@@ -29,6 +29,6 @@ class FinanceIncome extends Base
      * @return type
      */
     public function setIntoAccountTimeAttr($value) {
-        return $value && strtotime($value) > 0 ? $value : null;
+        return self::setTimeVal($value);
     }
 }

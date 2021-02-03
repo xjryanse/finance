@@ -8,6 +8,7 @@ use xjryanse\finance\logic\FinanceIncomeLogic;
 use xjryanse\finance\logic\FinanceIncomePayLogic;
 use xjryanse\finance\service\FinanceIncomePayService;
 use xjryanse\user\service\UserAccountLogService;
+use xjryanse\logic\Arrays;
 /**
  * 余额支付逻辑
  */
@@ -25,8 +26,13 @@ class Money extends Base implements UserPayInterface
     {
         //校验必须
         $incomeInfo = FinanceIncomeService::getInstance( $incomeId )->get(0);
+        if(!$incomeInfo){
+            return false;
+        }
         //生成支付单
-        $pay = FinanceIncomePayLogic::newPay($incomeInfo['id'], $incomeInfo['money'], $incomeInfo['pay_user_id'], ['pay_by'=>FR_FINANCE_MONEY]);
+        $data['order_id']   = Arrays::value($incomeInfo, 'order_id');
+        $data['pay_by']     = FR_FINANCE_MONEY;
+        $pay = FinanceIncomePayLogic::newPay($incomeInfo['id'], $incomeInfo['money'], $incomeInfo['pay_user_id'], $data );
         //记录数据
         $data['from_table'] = FinanceIncomePayService::mainModel()->getTable();
         $data['from_table_id'] = $pay['id'];

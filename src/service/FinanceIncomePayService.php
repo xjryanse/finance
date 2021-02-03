@@ -3,6 +3,8 @@
 namespace xjryanse\finance\service;
 
 use xjryanse\finance\logic\FinanceAccountLogic;
+use xjryanse\order\service\OrderFlowNodeService;
+use xjryanse\logic\Arrays;
 use Exception;
 
 /**
@@ -15,6 +17,23 @@ class FinanceIncomePayService {
 
     protected static $mainModel;
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceIncomePay';
+    
+    /**
+     * 额外输入信息
+     */
+    public static function extraAfterSave(&$data, $uuid) {
+        $orderId = Arrays::value($data, 'order_id');
+        //尝试流程节点的更新
+        if( $orderId ){
+            OrderFlowNodeService::lastNodeFinishAndNext( $orderId );
+        }
+    }
+    /**
+     * 额外输入信息
+     */
+    public static function extraAfterUpdate(&$data, $uuid) {
+        return self::extraAfterSave($data, $uuid);
+    }    
     
     /**
      * 根据收款单id获取支付来源
