@@ -25,12 +25,16 @@ class FinanceAccountLogService {
         $fromTable      = Arrays::value($data, 'from_table');
         $fromTableId    = Arrays::value($data, 'from_table_id');
         $service = DbOperate::getService( $fromTable );
+        $info = $service::getInstance( $fromTableId )->get(0);
         if( $service::mainModel()->hasField('into_account')){
-            $info = $service::getInstance( $fromTableId )->get(0);
             if( $info['into_account'] != 0){
                 throw new Exception('非待入账数据不可入账:'.$fromTable.'-'.$fromTableId);
             }
         }
+        //customer_id
+        $data['customer_id']    = Arrays::value($info, 'customer_id');
+        
+        return $data;
     }
     
     /**
@@ -58,6 +62,17 @@ class FinanceAccountLogService {
         $con[] = ['from_table_id','=',$fromTableId];
         
         return self::count($con) ? self::find( $con ) : false;
+    }
+    /**
+     * 计算客户端的账户余额
+     * @param type $customerId  公司id
+     * @param type $accountId   账户id
+     */
+    public static function customerMoneyCalc( $customerId, $accountId )
+    {
+        $con[] = ['customer_id','=',$customerId];
+        $con[] = ['account_id','=',$accountId];
+        return self::mainModel()->where($con)->sum( 'money' );
     }
     
     /**

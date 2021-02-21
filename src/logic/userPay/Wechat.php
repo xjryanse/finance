@@ -7,6 +7,7 @@ use xjryanse\finance\service\FinanceIncomePayService;
 use xjryanse\finance\logic\FinanceIncomePayLogic;
 use xjryanse\finance\logic\FinanceIncomeLogic;
 use xjryanse\wechat\service\WechatWxPayLogService;
+use xjryanse\logic\Arrays;
 use xjryanse\logic\DataCheck;
 use app\webapi\logic\pay\WxPayLogic;
 

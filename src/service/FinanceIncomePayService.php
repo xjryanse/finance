@@ -17,6 +17,14 @@ class FinanceIncomePayService {
 
     protected static $mainModel;
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceIncomePay';
+
+    public static function extraPreSave(&$data, $uuid) {
+        if(Arrays::value($data, 'income_id')){
+            $data['order_id']       = FinanceIncomeService::getInstance($data['income_id'])->fOrderId();
+            $data['customer_id']    = FinanceIncomeService::getInstance($data['income_id'])->fCustomerId();
+        }
+        return $data;
+    }
     
     /**
      * 额外输入信息

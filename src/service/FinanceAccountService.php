@@ -2,7 +2,6 @@
 
 namespace xjryanse\finance\service;
 
-use Exception;
 /**
  * 账户表
  */

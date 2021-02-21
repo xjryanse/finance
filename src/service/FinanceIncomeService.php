@@ -2,7 +2,6 @@
 
 namespace xjryanse\finance\service;
 
-use xjryanse\order\service\OrderService;
 use xjryanse\finance\service\FinanceIncomePayService;
 use Exception;
 /**
@@ -104,7 +103,10 @@ class FinanceIncomeService {
     public function fCompanyId() {
         return $this->getFFieldValue(__FUNCTION__);
     }
-
+    
+    public function fOrderId() {
+        return $this->getFFieldValue(__FUNCTION__);
+    }
     /**
      * 收款单号
      */
