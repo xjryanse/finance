@@ -59,6 +59,7 @@ class FinanceAccountLogService {
     public static function extraAfterSave(&$data, $uuid) {
         $customerId     = Arrays::value($data, 'customer_id');  //不一定有
         $accountId      = Arrays::value($data, 'account_id');        
+        $userId         = Arrays::value($data, 'user_id');      //支付用户（个人）        
         $fromTable      = Arrays::value($data, 'from_table');
         $fromTableId    = Arrays::value($data, 'from_table_id');
         if( $fromTable ){
@@ -72,6 +73,16 @@ class FinanceAccountLogService {
             $customerMoney = self::customerMoneyCalc($customerId, $accountId);
             CustomerService::mainModel()->where('id',$customerId)->update(['pre_pay_money'=>$customerMoney]);
         }
+        
+        //最新：更新客户的挂账款流水金额
+        if($customerId){
+            $manageAccountId = FinanceManageAccountService::customerManageAccountId($customerId);
+        } else {
+            $manageAccountId = FinanceManageAccountService::userManageAccountId($userId);
+        }
+        $data2 = Arrays::getByKeys($data, ['money','user_id','change_type']);
+        $data2['manage_account_id'] = $manageAccountId;
+        FinanceManageAccountLogService::save($data2);
     }
     
     public function delete()
