@@ -21,7 +21,7 @@ class FinanceAccountLogService {
      * 额外输入信息
      */
     public static function extraPreSave(&$data, $uuid) {
-        DataCheck::must($data, ['from_table','from_table_id','money','account_id']);
+        DataCheck::must($data, ['money','account_id']);
         $fromTable      = Arrays::value($data, 'from_table');
         $fromTableId    = Arrays::value($data, 'from_table_id');
         $service = DbOperate::getService( $fromTable );
