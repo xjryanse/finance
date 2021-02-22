@@ -2,6 +2,8 @@
 
 namespace xjryanse\finance\service;
 
+use xjryanse\logic\Arrays;
+use Exception;
 /**
  * 收款单-订单关联
  */
@@ -12,6 +14,54 @@ class FinanceStatementService {
 
     protected static $mainModel;
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceStatement';
+
+    /**
+     * 生成新的对账单
+     * @param type $customerId
+     * @param type $startTime
+     * @param type $endTime
+     * @param type $orderIdsArr
+     * @param type $data
+     */
+    public function newStatement( $customerId, $startTime,$endTime,$orderIdsArr,$data=[])
+    {
+        self::checkTransaction();
+        $data['customer_id']    = $customerId;
+        $data['start_time']     = $startTime;
+        $data['end_time']       = $endTime;
+        $statementId = self::saveGetId($data);
+        
+        foreach($orderIdsArr as &$value){
+            $value['customer_id']   = $customerId;
+            $value['statement_id']  = $statementId;
+            $value['statement_cate']  = Arrays::value($data, 'statement_cate');
+            if(FinanceStatementOrderService::hasStatement( $customerId, $value['order_id'] )){
+                throw new Exception('订单'.$value['order_id'] .'已经对账过了');
+            }
+            //一个一个添，有涉及其他表的状态更新
+            FinanceStatementOrderService::save($value);
+        }
+//        return FinanceStatementOrderService::saveAll($orderIdsArr);
+        return $statementId;
+    }
+    
+    public function delete()
+    {
+        self::checkTransaction();
+        $info = $this->get(0);
+        if( Arrays::value($info, 'has_confirm') ){
+            throw new Exception('客户已确认对账，不可删');
+        }
+        //删除对账单的明细
+        $con[] = ['statement_id','=',$this->uuid];
+        $statementOrders = FinanceStatementOrderService::lists( $con );
+        foreach( $statementOrders as $value){
+            //一个个删，可能涉及状态更新
+            FinanceStatementOrderService::getInstance($value['id'])->delete();
+        }
+
+        return $this->commDelete();
+    }
 
     /**
      *
@@ -65,7 +115,7 @@ class FinanceStatementService {
     /**
      * 已收款
      */
-    public function fHasSettle() {
+    public function fHasIncome() {
         return $this->getFFieldValue(__FUNCTION__);
     }
 

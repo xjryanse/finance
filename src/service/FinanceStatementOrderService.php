@@ -2,10 +2,12 @@
 
 namespace xjryanse\finance\service;
 
+use xjryanse\logic\Arrays;
+use xjryanse\order\service\OrderService;
 /**
  * 收款单-订单关联
  */
-class FinanceStatementService {
+class FinanceStatementOrderService {
 
     use \xjryanse\traits\InstTrait;
     use \xjryanse\traits\MainModelTrait;
@@ -13,6 +15,51 @@ class FinanceStatementService {
     protected static $mainModel;
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceStatementOrder';
 
+    /**
+     * 额外输入信息
+     */
+    public static function extraAfterSave(&$data, $uuid) {
+        self::checkTransaction();
+        $orderId                = Arrays::value($data, 'order_id');
+        $statementCate          = Arrays::value($data, 'statement_cate');
+        //订单表的对账字段
+        $orderStatementField    = self::getOrderStatementField($statementCate);
+        //订单状态更新为已对账
+        OrderService::mainModel()->where('id',$orderId)->update([$orderStatementField=>1]);
+    }
+    /**
+     * 订单表的对账字段
+     */
+    private static function getOrderStatementField($statementCate)
+    {
+        return 'has_'. ($statementCate ? $statementCate.'_' : '') .'statement';
+    }
+
+    public function delete()
+    {
+        self::checkTransaction();
+        //删除对账单的明细
+        $info = $this->get(0);
+        $orderId                = Arrays::value($info, 'order_id');
+        $statementCate          = Arrays::value($info, 'statement_cate');        
+        //订单表的对账字段
+        $orderStatementField    = self::getOrderStatementField($statementCate);
+        //订单状态更新为未对账
+        OrderService::mainModel()->where('id',$orderId)->update([$orderStatementField=>0]);
+
+        return $this->commDelete();
+    }    
+    
+    /*
+     * 订单是否已对账
+     * 一笔订单在一个客户下只对账一次。
+     */
+    public static function hasStatement( $customerId, $orderId )
+    {
+        $con[] = ['customer_id','=',$customerId];
+        $con[] = ['order_id','=',$orderId];
+        return self::mainModel()->where( $con )->value('id');
+    }
     /**
      *
      */
