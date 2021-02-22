@@ -57,7 +57,15 @@ class FinanceAccountService {
         //账户余额更新
         return self::mainModel()->where('id', $this->uuid)->setDec('money', $value);
     }    
-
+    /**
+     * 更新余额
+     */
+    public function updateRemainMoney()
+    {
+        $con[] = ['account_id','=',$this->uuid];
+        $money = FinanceAccountLogService::mainModel()->where($con)->sum('money');
+        return self::mainModel()->where('id',$this->uuid)->update(['money'=>$money]);
+    }
     /**
      *
      */

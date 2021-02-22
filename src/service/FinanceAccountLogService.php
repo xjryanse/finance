@@ -5,6 +5,7 @@ namespace xjryanse\finance\service;
 use xjryanse\logic\Arrays;
 use xjryanse\logic\DbOperate;
 use xjryanse\logic\DataCheck;
+use xjryanse\customer\service\CustomerService;
 use Exception;
 /**
  * 账户流水表
@@ -22,18 +23,33 @@ class FinanceAccountLogService {
      */
     public static function extraPreSave(&$data, $uuid) {
         DataCheck::must($data, ['money','account_id']);
+        $customerId     = Arrays::value($data, 'customer_id');  //不一定有
+        $accountId      = Arrays::value($data, 'account_id');
         $fromTable      = Arrays::value($data, 'from_table');
         $fromTableId    = Arrays::value($data, 'from_table_id');
-        $service = DbOperate::getService( $fromTable );
-        $info = $service::getInstance( $fromTableId )->get(0);
-        if( $service::mainModel()->hasField('into_account')){
-            if( $info['into_account'] != 0){
-                throw new Exception('非待入账数据不可入账:'.$fromTable.'-'.$fromTableId);
+        if($fromTable){
+            $service = DbOperate::getService( $fromTable );
+            $info = $service::getInstance( $fromTableId )->get(0);
+            if( $service::mainModel()->hasField('into_account')){
+                if( $info['into_account'] != 0){
+                    throw new Exception('非待入账数据不可入账:'.$fromTable.'-'.$fromTableId);
+                }
+            }
+            //customer_id
+            $data['customer_id']    = Arrays::value($data, 'customer_id') ? :Arrays::value($info, 'customer_id');
+        }
+        //出账，负值
+        if( Arrays::value($data, 'change_type') == '2' ){
+            $data['money']  = -1 * abs($data['money']);
+            //小于客户余额，不可出账
+            if( $customerId ){
+                $customerMoney = self::customerMoneyCalc($customerId, $accountId);
+                if( abs($data['money']) > $customerMoney ){
+                    throw new Exception('该客户最多可退￥'.$customerMoney);
+                }
             }
         }
-        //customer_id
-        $data['customer_id']    = Arrays::value($info, 'customer_id');
-        
+
         return $data;
     }
     
@@ -41,13 +57,31 @@ class FinanceAccountLogService {
      * 额外输入信息
      */
     public static function extraAfterSave(&$data, $uuid) {
+        $customerId     = Arrays::value($data, 'customer_id');  //不一定有
+        $accountId      = Arrays::value($data, 'account_id');        
         $fromTable      = Arrays::value($data, 'from_table');
         $fromTableId    = Arrays::value($data, 'from_table_id');
         if( $fromTable ){
             $service = DbOperate::getService( $fromTable );
             $service::getInstance( $fromTableId )->update( ['into_account'=>1]);    //来源表入账状态更新为已入账
         }
-    }    
+        //更新账户余额
+        FinanceAccountService::getInstance( $accountId )->updateRemainMoney();
+        //更新客户挂账
+        if(FinanceAccountService::getInstance($accountId)->fAccountType() == 'customer'){
+            $customerMoney = self::customerMoneyCalc($customerId, $accountId);
+            CustomerService::mainModel()->where('id',$customerId)->update(['pre_pay_money'=>$customerMoney]);
+        }
+    }
+    
+    public function delete()
+    {
+        $info = $this->get();
+        $res = $this->commDelete();
+        //更新账户余额
+        FinanceAccountService::getInstance( $info['account_id'])->updateRemainMoney();
+        return $res;
+    }
     /**
      * 来源表和来源id查是否有记录：
      * 一般用于判断该笔记录是否已入账，避免重复入账
