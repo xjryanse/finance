@@ -65,7 +65,7 @@ class FinanceStatementService {
     /**
      * 已收款
      */
-    public function fHasIncome() {
+    public function fHasSettle() {
         return $this->getFFieldValue(__FUNCTION__);
     }
 
