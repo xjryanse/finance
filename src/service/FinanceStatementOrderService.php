@@ -24,9 +24,27 @@ class FinanceStatementOrderService {
         $statementCate          = Arrays::value($data, 'statement_cate');
         //订单表的对账字段
         $orderStatementField    = self::getOrderStatementField($statementCate);
-        //订单状态更新为已对账
-        OrderService::mainModel()->where('id',$orderId)->update([$orderStatementField=>1]);
+        if(OrderService::mainModel()->hasField($orderStatementField)){
+            //订单状态更新为已对账
+            OrderService::mainModel()->where('id',$orderId)->update([$orderStatementField=>1]);
+            //订单的已付金额
+            $payPrize = self::orderSettleMoneyCalc($orderId);
+            //订单的已付金额更新
+            OrderService::getInstance($orderId)->update(["pay_prize"=>$payPrize]);
+        }
     }
+    /**
+     * 额外输入信息
+     */
+    public static function extraAfterUpdate(&$data, $uuid) {
+        self::checkTransaction();
+        $info       = self::getInstance( $uuid )->get();
+        $orderId    = Arrays::value( $info , 'order_id');
+        //订单的已付金额
+        $payPrize   = self::orderSettleMoneyCalc($orderId);
+        //订单的已付金额更新
+        OrderService::getInstance($orderId)->update(["pay_prize"=>$payPrize]);
+    }    
     /**
      * 订单表的对账字段
      */
@@ -46,13 +64,30 @@ class FinanceStatementOrderService {
         $orderStatementField    = self::getOrderStatementField($statementCate);
         //订单状态更新为未对账
         OrderService::mainModel()->where('id',$orderId)->update([$orderStatementField=>0]);
-
-        return $this->commDelete();
+        //删除对账订单。
+        $res = $this->commDelete();
+        //订单的已付金额
+        $payPrize = self::orderSettleMoneyCalc($orderId);
+        //订单的已付金额更新
+        OrderService::getInstance($orderId)->update(["pay_prize"=>$payPrize]);
+        return $res;
     }    
     
+    /**
+     * 统计订单已付金额
+     * @param type $orderId
+     * @return type
+     */
+    public static function orderSettleMoneyCalc( $orderId )
+    {
+        $con[] = ['order_id','=',$orderId];
+        $con[] = ['has_settle','=',1];
+        return self::mainModel()->where($con)->sum( 'need_pay_prize' );
+    }
+
     /*
      * 订单是否已对账
-     * 一笔订单在一个客户下只对账一次。
+     * TODO 优化 一笔订单在一个客户下只对账一次。
      */
     public static function hasStatement( $customerId, $orderId )
     {

@@ -25,6 +25,7 @@ class FinanceStatementService {
      */
     public function newStatement( $customerId, $startTime,$endTime,$orderIdsArr,$data=[])
     {
+        return false;
         self::checkTransaction();
         $data['customer_id']    = $customerId;
         $data['start_time']     = $startTime;
@@ -45,6 +46,31 @@ class FinanceStatementService {
         return $statementId;
     }
     
+    public static function save( $data )
+    {
+        self::checkTransaction();
+        if(!Arrays::value($data, 'order_id')){
+            throw new Exception('请选择订单');
+        }
+        $res = self::commSave($data);
+        //转为数组存
+        if(is_string($data['order_id'])){
+            //单笔订单的存法
+            $data['order_id'] = [$data];
+        }
+        foreach($data['order_id'] as &$value){
+            $value['customer_id']       = Arrays::value($data, 'customer_id');
+            $value['statement_id']      = $res['id'];
+            $value['statement_cate']    = Arrays::value($res, 'statement_cate');
+//            if(FinanceStatementOrderService::hasStatement( $customerId, $value['order_id'] )){
+//                throw new Exception('订单'.$value['order_id'] .'已经对账过了');
+//            }
+            //一个一个添，有涉及其他表的状态更新
+            FinanceStatementOrderService::save($value);
+        }        
+        return $res;
+    }
+    
     public function delete()
     {
         self::checkTransaction();
@@ -62,7 +88,70 @@ class FinanceStatementService {
 
         return $this->commDelete();
     }
+    
+    public static function extraPreUpdate(&$data, $uuid) {
+        $hasSettle = Arrays::value($data, 'has_settle');
+        if( $hasSettle ){
+            self::getInstance($uuid)->settle();
+        } else {
+            self::getInstance($uuid)->cancelSettle();
+        }
+    }
 
+    /**
+     * 对冲结算逻辑
+     */
+    protected function settle()
+    {
+        self::checkTransaction();
+        if(FinanceManageAccountLogService::hasLog(self::mainModel()->getTable(), $this->uuid)){
+            return false;
+        }
+        $info = $this->get();
+        $customerId     = Arrays::value($info, 'customer_id');
+        $needPayPrize   = Arrays::value($info, 'need_pay_prize');   //正-他欠我，负-我欠他
+        //扣减对冲账户余额
+        $manageAccountId = FinanceManageAccountService::customerManageAccountId($customerId);
+        if($needPayPrize > 0){
+            $data['change_type'] = 2;   //客户出账，我进账，客户金额越来越少
+        } else {
+            $data['change_type'] = 1;   //客户进账，我出账，客户金额越来越多
+        }
+        $data['manage_account_id'] = $manageAccountId;
+        $data['money']          = Arrays::value($info, 'need_pay_prize');
+        $data['from_table']     = self::mainModel()->getTable();
+        $data['from_table_id']  = $this->uuid;      
+        //登记冲账
+        FinanceManageAccountLogService::save($data);
+        $res = self::mainModel()->where('id',$this->uuid)->update(['has_settle'=>1]);   //更新为已结算
+        //冗余
+        $con[] = ['statement_id','=',$this->uuid];
+        $lists = FinanceStatementOrderService::lists( $con );
+        foreach( $lists as $v){
+            FinanceStatementOrderService::getInstance( $v['id'] )->update(['has_settle'=>1]);   //更新为已结算
+        }
+        return $res;
+    }
+    
+    /**
+     * 取消对冲结算逻辑
+     */
+    protected function cancelSettle()
+    {
+        self::checkTransaction();
+        $con[]  =   ['from_table','=',self::mainModel()->getTable()];
+        $con[]  =   ['from_table_id','=',$this->uuid];
+        $lists = FinanceManageAccountLogService::lists($con);
+        foreach( $lists as $v){
+            //一个个删，可能关联其他的删除
+            FinanceManageAccountLogService::getInstance($v['id'])->delete();
+        }
+        
+        $res = self::mainModel()->where('id',$this->uuid)->update(['has_settle'=>0]);   //更新为未结算
+        //冗余
+        FinanceStatementOrderService::mainModel()->where('statement_id',$this->uuid)->update(['has_settle'=>0]);   //更新为未结算
+        return $res;
+    }
     /**
      *
      */
@@ -115,7 +204,7 @@ class FinanceStatementService {
     /**
      * 已收款
      */
-    public function fHasIncome() {
+    public function fHasSettle() {
         return $this->getFFieldValue(__FUNCTION__);
     }
 

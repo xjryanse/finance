@@ -16,7 +16,8 @@ class FinanceManageAccountLogService {
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceManageAccountLog';
     
     public static function extraPreSave(&$data, $uuid) {
-        DataCheck::must($data, ['money','manage_account_id']);
+        DataCheck::must($data, ['manage_account_id']);  //money可能存在为0的情况
+        $accountId          = Arrays::value($data, 'account_id');       //账户id
         $manageAccountId    = Arrays::value($data, 'manage_account_id');
         $manageAccountInfo  = FinanceManageAccountService::getInstance($manageAccountId)->get();
         $data['belong_table'] = Arrays::value($manageAccountInfo, 'belong_table');
@@ -26,6 +27,10 @@ class FinanceManageAccountLogService {
         if( Arrays::value($data, 'change_type') == '2' ){
             $data['money']  = -1 * abs($data['money']);
         }
+        //账户id，取账户类型
+        if($accountId){
+            $data['account_type'] = FinanceAccountService::getInstance( $accountId )->fAccountType();
+        }
         
         return $data;
     }
@@ -34,6 +39,17 @@ class FinanceManageAccountLogService {
         $manageAccountId    = Arrays::value($data, 'manage_account_id');         
         $customerMoney      = self::moneyCalc( $manageAccountId );
         FinanceManageAccountService::mainModel()->where('id',$manageAccountId)->update(['money'=>$customerMoney]);        
+    }
+    
+    public function delete()
+    {
+        $info = $this->get();
+        $res = $this->commDelete();
+        $manageAccountId    = Arrays::value($info, 'manage_account_id');         
+        $customerMoney      = self::moneyCalc( $manageAccountId );
+        FinanceManageAccountService::mainModel()->where('id',$manageAccountId)->update(['money'=>$customerMoney]);        
+
+        return $res;
     }    
     
     /**
@@ -45,5 +61,21 @@ class FinanceManageAccountLogService {
     {
         $con[] = ['manage_account_id','=',$manageAccountId];
         return self::mainModel()->where($con)->sum( 'money' );
+    }    
+    
+    /**
+     * 来源表和来源id查是否有记录：
+     * 一般用于判断该笔记录是否已入账，避免重复入账
+     * @param type $fromTable   来源表
+     * @param type $fromTableId 来源表id
+     */
+    public static function hasLog( $fromTable, $fromTableId )
+    {
+        //`from_table` varchar(255) DEFAULT '' COMMENT '来源表',
+        //`from_table_id` varchar(32) DEFAULT '' COMMENT '来源表id',
+        $con[] = ['from_table','=',$fromTable];
+        $con[] = ['from_table_id','=',$fromTableId];
+        
+        return self::count($con) ? self::find( $con ) : false;
     }    
 }

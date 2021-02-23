@@ -37,7 +37,15 @@ class FinanceAccountLogService {
             }
             //customer_id
             $data['customer_id']    = Arrays::value($data, 'customer_id') ? :Arrays::value($info, 'customer_id');
+            $data['user_id']        = Arrays::value($data, 'user_id') ? :Arrays::value($info, 'user_id');
         }
+        if(!Arrays::value($data, 'customer_id') && !Arrays::value($data, 'user_id')){
+            throw new Exception('付款客户或付款用户必须(customer_id/user_id)');
+        }
+        if(!Arrays::value($data, 'change_type')){
+            throw new Exception('未指定出账还是入账');
+        }
+
         //出账，负值
         if( Arrays::value($data, 'change_type') == '2' ){
             $data['money']  = -1 * abs($data['money']);
@@ -62,6 +70,11 @@ class FinanceAccountLogService {
         $userId         = Arrays::value($data, 'user_id');      //支付用户（个人）        
         $fromTable      = Arrays::value($data, 'from_table');
         $fromTableId    = Arrays::value($data, 'from_table_id');
+        $statementId    = Arrays::value($data, 'statement_id'); //对账单id
+        if( $statementId && FinanceStatementService::getInstance($statementId)->fHasSettle() ){
+            throw new Exception('账单已结算');            
+        }
+        
         if( $fromTable ){
             $service = DbOperate::getService( $fromTable );
             $service::getInstance( $fromTableId )->update( ['into_account'=>1]);    //来源表入账状态更新为已入账
@@ -80,9 +93,16 @@ class FinanceAccountLogService {
         } else {
             $manageAccountId = FinanceManageAccountService::userManageAccountId($userId);
         }
-        $data2 = Arrays::getByKeys($data, ['money','user_id','change_type']);
+        $data2 = Arrays::getByKeys($data, ['money','user_id','account_id','change_type']);
         $data2['manage_account_id'] = $manageAccountId;
+        $data2['from_table']    = self::mainModel()->getTable();
+        $data2['from_table_id'] = $uuid;
         FinanceManageAccountLogService::save($data2);
+        
+        //【对账单id】（如有关联对账单id，进行对冲结算）
+        if($statementId){
+            FinanceStatementService::getInstance($statementId)->update(['has_settle'=>1]);
+        }
     }
     
     public function delete()
@@ -91,6 +111,15 @@ class FinanceAccountLogService {
         $res = $this->commDelete();
         //更新账户余额
         FinanceAccountService::getInstance( $info['account_id'])->updateRemainMoney();
+        //删除管理账的明细
+        $con[] = ['from_table','=',self::mainModel()->getTable()];
+        $con[] = ['from_table_id','=',$info['id']];
+        $lists = FinanceManageAccountLogService::lists( $con );
+        foreach($lists as &$v){
+            //一个个删，可能有关联
+            FinanceManageAccountLogService::getInstance( $v['id'])->delete();
+        }
+        
         return $res;
     }
     /**

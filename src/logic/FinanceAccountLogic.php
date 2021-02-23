@@ -4,6 +4,7 @@ namespace xjryanse\finance\logic;
 use xjryanse\system\interfaces\AccountLogicInterface;
 use xjryanse\finance\service\FinanceAccountService;
 use xjryanse\finance\service\FinanceAccountLogService;
+use xjryanse\logic\Arrays;
 
 use Exception;
 /**
@@ -38,6 +39,8 @@ class FinanceAccountLogic implements AccountLogicInterface
         $info       = FinanceAccountService::getInstance( $accountId )->get(0);
         //新增流水
         $data['company_id']     = $companyId ? :session(SESSION_COMPANY_ID);
+        $data['customer_id']    = Arrays::value($data, 'customer_id');
+        $data['user_id']        = Arrays::value($data, 'user_id');
         $data['account_id']     = $info['id'];
         $data['change_type']    = 1;            //进账
         $data['before_money']   = $info['money'];

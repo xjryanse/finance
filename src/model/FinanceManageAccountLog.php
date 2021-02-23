@@ -6,5 +6,7 @@ namespace xjryanse\finance\model;
  */
 class FinanceManageAccountLog extends Base
 {
-
+    public function setBillTimeAttr($value) {
+        return self::setTimeVal($value);
+    }
 }
