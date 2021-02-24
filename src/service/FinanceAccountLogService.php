@@ -101,7 +101,7 @@ class FinanceAccountLogService {
         
         //【对账单id】（如有关联对账单id，进行对冲结算）
         if($statementId){
-            FinanceStatementService::getInstance($statementId)->update(['has_settle'=>1]);
+            FinanceStatementService::getInstance($statementId)->update(['has_settle'=>1,"account_log_id"=>$uuid]);
         }
     }
     

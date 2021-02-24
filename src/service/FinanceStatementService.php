@@ -15,6 +15,14 @@ class FinanceStatementService {
     protected static $mainModel;
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceStatement';
 
+    public static function extraDetail(&$item, $uuid) {
+        if(!$item){ return false;}
+        $manageAccountId = Arrays::value( $item , 'manage_account_id');
+        //管理账户余额
+        $info = FinanceManageAccountService::getInstance( $manageAccountId )->get(0);
+        $item['manageAccountMoney'] = Arrays::value( $info , 'money');
+        return $item;
+    }
     /**
      * 生成新的对账单
      * @param type $customerId
@@ -89,10 +97,31 @@ class FinanceStatementService {
         return $this->commDelete();
     }
     
+    public static function extraPreSave(&$data, $uuid) {
+        //步骤1
+        $needPayPrize = Arrays::value($data, 'need_pay_prize');
+        if($needPayPrize >= 0){
+            $data['change_type'] = 1;
+        } else {
+            $data['change_type'] = 2;
+        }        
+        //步骤2
+        $customerId   = Arrays::value($data, 'customer_id');        
+        $userId       = Arrays::value($data, 'user_id');        
+        /*管理账户id*/
+        if($customerId){
+            $manageAccountId = FinanceManageAccountService::customerManageAccountId($customerId);
+        } else {
+            $manageAccountId = FinanceManageAccountService::userManageAccountId($userId);
+        }
+        $data['manage_account_id'] = $manageAccountId;
+    }
+    
     public static function extraPreUpdate(&$data, $uuid) {
-        $hasSettle = Arrays::value($data, 'has_settle');
+        $hasSettle      = Arrays::value($data, 'has_settle');
+        $accountLogId   = Arrays::value($data, 'account_log_id');
         if( $hasSettle ){
-            self::getInstance($uuid)->settle();
+            self::getInstance($uuid)->settle( $accountLogId );
         } else {
             self::getInstance($uuid)->cancelSettle();
         }
@@ -101,7 +130,7 @@ class FinanceStatementService {
     /**
      * 对冲结算逻辑
      */
-    protected function settle()
+    protected function settle( $accountLogId = '')
     {
         self::checkTransaction();
         if(FinanceManageAccountLogService::hasLog(self::mainModel()->getTable(), $this->uuid)){
@@ -109,13 +138,27 @@ class FinanceStatementService {
         }
         $info = $this->get();
         $customerId     = Arrays::value($info, 'customer_id');
+        $userId         = Arrays::value($info, 'user_id');
         $needPayPrize   = Arrays::value($info, 'need_pay_prize');   //正-他欠我，负-我欠他
         //扣减对冲账户余额
-        $manageAccountId = FinanceManageAccountService::customerManageAccountId($customerId);
+        if($customerId){
+            $manageAccountId = FinanceManageAccountService::customerManageAccountId($customerId);
+        } else {
+            $manageAccountId = FinanceManageAccountService::userManageAccountId($userId);
+        }        
+        $manageAccountInfo  = FinanceManageAccountService::getInstance( $manageAccountId )->get(0);        
+        $manageAccountMoney = Arrays::value($manageAccountInfo, 'money');   //账户余额
+
         if($needPayPrize > 0){
             $data['change_type'] = 2;   //客户出账，我进账，客户金额越来越少
+            if($manageAccountMoney<$needPayPrize && !$accountLogId){
+                throw new Exception('客户账户余额(￥'. $manageAccountMoney  .')不足无法冲抵');
+            }
         } else {
             $data['change_type'] = 1;   //客户进账，我出账，客户金额越来越多
+            if($manageAccountMoney > $needPayPrize && !$accountLogId){
+                throw new Exception('该客户当前已付款(￥'. abs($manageAccountMoney)  .')不足无法冲抵');
+            }
         }
         $data['manage_account_id'] = $manageAccountId;
         $data['money']          = Arrays::value($info, 'need_pay_prize');
@@ -123,7 +166,7 @@ class FinanceStatementService {
         $data['from_table_id']  = $this->uuid;      
         //登记冲账
         FinanceManageAccountLogService::save($data);
-        $res = self::mainModel()->where('id',$this->uuid)->update(['has_settle'=>1]);   //更新为已结算
+        $res = self::mainModel()->where('id',$this->uuid)->update(['has_settle'=>1,"account_log_id"=>$accountLogId]);   //更新为已结算
         //冗余
         $con[] = ['statement_id','=',$this->uuid];
         $lists = FinanceStatementOrderService::lists( $con );
@@ -147,7 +190,7 @@ class FinanceStatementService {
             FinanceManageAccountLogService::getInstance($v['id'])->delete();
         }
         
-        $res = self::mainModel()->where('id',$this->uuid)->update(['has_settle'=>0]);   //更新为未结算
+        $res = self::mainModel()->where('id',$this->uuid)->update(['has_settle'=>0,"account_log_id"=>""]);   //更新为未结算
         //冗余
         FinanceStatementOrderService::mainModel()->where('statement_id',$this->uuid)->update(['has_settle'=>0]);   //更新为未结算
         return $res;

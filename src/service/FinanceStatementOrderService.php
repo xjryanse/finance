@@ -15,6 +15,15 @@ class FinanceStatementOrderService {
     protected static $mainModel;
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceStatementOrder';
 
+    public static function extraPreSave(&$data, $uuid) {
+        $needPayPrize = Arrays::value($data, 'need_pay_prize');
+        if($needPayPrize >= 0){
+            $data['change_type'] = 1;
+        } else {
+            $data['change_type'] = 2;
+        }
+    }
+    
     /**
      * 额外输入信息
      */
@@ -27,10 +36,8 @@ class FinanceStatementOrderService {
         if(OrderService::mainModel()->hasField($orderStatementField)){
             //订单状态更新为已对账
             OrderService::mainModel()->where('id',$orderId)->update([$orderStatementField=>1]);
-            //订单的已付金额
-            $payPrize = self::orderSettleMoneyCalc($orderId);
-            //订单的已付金额更新
-            OrderService::getInstance($orderId)->update(["pay_prize"=>$payPrize]);
+            //订单的金额更新
+            self::orderMoneyUpdate($orderId);
         }
     }
     /**
@@ -40,10 +47,8 @@ class FinanceStatementOrderService {
         self::checkTransaction();
         $info       = self::getInstance( $uuid )->get();
         $orderId    = Arrays::value( $info , 'order_id');
-        //订单的已付金额
-        $payPrize   = self::orderSettleMoneyCalc($orderId);
-        //订单的已付金额更新
-        OrderService::getInstance($orderId)->update(["pay_prize"=>$payPrize]);
+        //订单的金额更新
+        self::orderMoneyUpdate($orderId);
     }    
     /**
      * 订单表的对账字段
@@ -66,10 +71,8 @@ class FinanceStatementOrderService {
         OrderService::mainModel()->where('id',$orderId)->update([$orderStatementField=>0]);
         //删除对账订单。
         $res = $this->commDelete();
-        //订单的已付金额
-        $payPrize = self::orderSettleMoneyCalc($orderId);
-        //订单的已付金额更新
-        OrderService::getInstance($orderId)->update(["pay_prize"=>$payPrize]);
+        //订单的金额更新
+        self::orderMoneyUpdate($orderId);
         return $res;
     }    
     
@@ -78,13 +81,38 @@ class FinanceStatementOrderService {
      * @param type $orderId
      * @return type
      */
-    public static function orderSettleMoneyCalc( $orderId )
+    protected static function orderSettleMoneyCalc( $orderId ,$con = [])
     {
         $con[] = ['order_id','=',$orderId];
         $con[] = ['has_settle','=',1];
         return self::mainModel()->where($con)->sum( 'need_pay_prize' );
     }
-
+    /**
+     * 订单金额更新
+     */
+    protected static function orderMoneyUpdate( $orderId )
+    {
+        //已收金额
+        $con1[] = ['statement_cate','=','buyer'];
+        $con1[] = ['change_type','=','1'];
+        $data["pay_prize"]      = self::orderSettleMoneyCalc( $orderId, $con1);
+        //已付金额
+        $con2[] = ['statement_cate','=','seller'];
+        $con2[] = ['change_type','=','2'];
+        $data["outcome_prize"]  = self::orderSettleMoneyCalc( $orderId, $con2 );
+        //毛利
+        $data["final_prize"]    = self::orderSettleMoneyCalc( $orderId );
+        //更新金额
+        OrderService::getInstance($orderId)->update( $data );
+//  `pre_prize` decimal(10,2) DEFAULT '0.00' COMMENT '最小定金，关联发车付款进度',
+//  `order_prize` decimal(10,2) DEFAULT '0.00' COMMENT '订单金额，关联发车付款进度',
+//  `pay_prize` decimal(10,2) DEFAULT '0.00' COMMENT '已收金额',
+//  `refund_prize` decimal(10,2) DEFAULT '0.00' COMMENT '收退金额',
+//  `outcome_prize` decimal(10,2) DEFAULT '0.00' COMMENT '已付金额',
+//  `outcome_refund_prize` decimal(10,2) DEFAULT '0.00' COMMENT '付退金额',
+//  `distri_prize` decimal(10,2) DEFAULT '0.00' COMMENT '已分派金额',
+    }
+    
     /*
      * 订单是否已对账
      * TODO 优化 一笔订单在一个客户下只对账一次。

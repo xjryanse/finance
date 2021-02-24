@@ -27,6 +27,10 @@ class FinanceManageAccountLogService {
         if( Arrays::value($data, 'change_type') == '2' ){
             $data['money']  = -1 * abs($data['money']);
         }
+        //入账，正值
+        if( Arrays::value($data, 'change_type') == '1' ){
+            $data['money']  = abs($data['money']);
+        }
         //账户id，取账户类型
         if($accountId){
             $data['account_type'] = FinanceAccountService::getInstance( $accountId )->fAccountType();
