@@ -24,9 +24,14 @@ class FinanceAccountLogService {
     public static function extraPreSave(&$data, $uuid) {
         DataCheck::must($data, ['money','account_id']);
         $customerId     = Arrays::value($data, 'customer_id');  //不一定有
+        $userId         = Arrays::value($data, 'user_id');      //不一定有
         $accountId      = Arrays::value($data, 'account_id');
         $fromTable      = Arrays::value($data, 'from_table');
         $fromTableId    = Arrays::value($data, 'from_table_id');
+        $statementId    = Arrays::value($data, 'statement_id'); //对账单id
+        if($statementId && (!$customerId && !$userId)){
+            throw new Exception("缺少客户和用户");
+        }        
         if($fromTable){
             $service = DbOperate::getService( $fromTable );
             $info = $service::getInstance( $fromTableId )->get(0);

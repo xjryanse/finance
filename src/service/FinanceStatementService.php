@@ -121,12 +121,12 @@ class FinanceStatementService {
         if($needPayPrize > 0){
             $data['change_type'] = 2;   //客户出账，我进账，客户金额越来越少
             if($manageAccountMoney<$needPayPrize && !$accountLogId){
-                throw new Exception('客户账户余额(￥'. $manageAccountMoney  .')不足无法冲抵');
+                throw new Exception('客户账户余额(￥'. $manageAccountMoney  .')不足，请先收款');
             }
         } else {
             $data['change_type'] = 1;   //客户进账，我出账，客户金额越来越多
             if($manageAccountMoney > $needPayPrize && !$accountLogId){
-                throw new Exception('该客户当前已付款(￥'. abs($manageAccountMoney)  .')不足无法冲抵');
+                throw new Exception('该客户当前已付款(￥'. abs($manageAccountMoney)  .')不足，请先付款');
             }
         }
         $data['manage_account_id'] = $manageAccountId;
