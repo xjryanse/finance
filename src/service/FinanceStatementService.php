@@ -23,36 +23,6 @@ class FinanceStatementService {
         $item['manageAccountMoney'] = Arrays::value( $info , 'money');
         return $item;
     }
-    /**
-     * 生成新的对账单
-     * @param type $customerId
-     * @param type $startTime
-     * @param type $endTime
-     * @param type $orderIdsArr
-     * @param type $data
-     */
-    public function newStatement( $customerId, $startTime,$endTime,$orderIdsArr,$data=[])
-    {
-        return false;
-        self::checkTransaction();
-        $data['customer_id']    = $customerId;
-        $data['start_time']     = $startTime;
-        $data['end_time']       = $endTime;
-        $statementId = self::saveGetId($data);
-        
-        foreach($orderIdsArr as &$value){
-            $value['customer_id']   = $customerId;
-            $value['statement_id']  = $statementId;
-            $value['statement_cate']  = Arrays::value($data, 'statement_cate');
-            if(FinanceStatementOrderService::hasStatement( $customerId, $value['order_id'] )){
-                throw new Exception('订单'.$value['order_id'] .'已经对账过了');
-            }
-            //一个一个添，有涉及其他表的状态更新
-            FinanceStatementOrderService::save($value);
-        }
-//        return FinanceStatementOrderService::saveAll($orderIdsArr);
-        return $statementId;
-    }
     
     public static function save( $data )
     {
@@ -100,11 +70,10 @@ class FinanceStatementService {
     public static function extraPreSave(&$data, $uuid) {
         //步骤1
         $needPayPrize = Arrays::value($data, 'need_pay_prize');
-        if($needPayPrize >= 0){
-            $data['change_type'] = 1;
-        } else {
-            $data['change_type'] = 2;
-        }        
+        //生成变动类型
+        if(!Arrays::value($data, 'change_type')){
+            $data['change_type'] =  $needPayPrize >= 0 ? 1 : 2;
+        }
         //步骤2
         $customerId   = Arrays::value($data, 'customer_id');        
         $userId       = Arrays::value($data, 'user_id');        

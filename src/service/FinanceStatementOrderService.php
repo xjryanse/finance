@@ -17,11 +17,17 @@ class FinanceStatementOrderService {
 
     public static function extraPreSave(&$data, $uuid) {
         $needPayPrize = Arrays::value($data, 'need_pay_prize');
-        if($needPayPrize >= 0){
-            $data['change_type'] = 1;
-        } else {
-            $data['change_type'] = 2;
+        if(!Arrays::value($data, 'change_type')){
+            $data['change_type'] =  $needPayPrize >= 0 ? 1 : 2;
         }
+        if(Arrays::value($data, 'change_type')){
+            if( Arrays::value($data, 'change_type') == 1 ){
+                $data['need_pay_prize'] = abs($needPayPrize);//入账，正值
+            }
+            if( Arrays::value($data, 'change_type') == 2 ){
+                $data['need_pay_prize'] = -1 * abs($needPayPrize);//入账，正值
+            }
+        }        
     }
     
     /**
@@ -100,6 +106,14 @@ class FinanceStatementOrderService {
         $con2[] = ['statement_cate','=','seller'];
         $con2[] = ['change_type','=','2'];
         $data["outcome_prize"]  = self::orderSettleMoneyCalc( $orderId, $con2 );
+        //收退金额
+        $con3[] = ['statement_cate','=','buyer'];  //买家，出账
+        $con3[] = ['change_type','=','2'];
+        $data["refund_prize"]  = self::orderSettleMoneyCalc( $orderId, $con3 );
+        //付退金额
+        $con4[] = ['statement_cate','=','seller'];  //卖家，入账
+        $con4[] = ['change_type','=','1'];
+        $data["outcome_refund_prize"]  = self::orderSettleMoneyCalc( $orderId, $con4 );
         //毛利
         $data["final_prize"]    = self::orderSettleMoneyCalc( $orderId );
         //更新金额
