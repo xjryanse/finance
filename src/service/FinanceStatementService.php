@@ -3,18 +3,38 @@
 namespace xjryanse\finance\service;
 
 use xjryanse\logic\Arrays;
+use xjryanse\order\service\OrderService;
+use xjryanse\system\service\SystemCateService;
 use Exception;
 /**
  * 收款单-订单关联
  */
 class FinanceStatementService {
-
     use \xjryanse\traits\InstTrait;
     use \xjryanse\traits\MainModelTrait;
 
     protected static $mainModel;
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceStatement';
 
+    /**
+     * 单订单生成对账单名称
+     * @param type $orderId
+     */
+    public static function getStatementNameByOrderId( $orderId, $statementType )
+    {
+        //商品名称加上价格的名称
+        $fGoodsName         = OrderService::getInstance( $orderId )->fGoodsName();
+        $cateKey            = $statementType;
+        $keyId              = SystemCateService::keyGetId('prizeKeyAll', $cateKey);      //prizeKeyAll，全部的价格key
+        if($keyId){
+            //处理对账单名称
+            $statementName = $fGoodsName ." ". SystemCateService::getInstance($keyId)->fCateName();
+        } else {
+            $statementName = $fGoodsName;
+        }
+        return $statementName;
+    }
+    
     public static function extraDetail(&$item, $uuid) {
         if(!$item){ return false;}
         $manageAccountId = Arrays::value( $item , 'manage_account_id');
@@ -29,6 +49,11 @@ class FinanceStatementService {
         self::checkTransaction();
         if(!Arrays::value($data, 'order_id')){
             throw new Exception('请选择订单');
+        }
+        //转为数组存
+        if(is_string($data['order_id'])){
+            $cateKey            = Arrays::value($data, 'statement_type');
+            $data['statement_name'] = self::getStatementNameByOrderId( $data['order_id'] , $cateKey);
         }
         $res = self::commSave($data);
         //转为数组存
@@ -79,8 +104,10 @@ class FinanceStatementService {
         $userId       = Arrays::value($data, 'user_id');        
         /*管理账户id*/
         if($customerId){
+            $data['belong_cate'] = 'customer';  //账单归属：单位
             $manageAccountId = FinanceManageAccountService::customerManageAccountId($customerId);
         } else {
+            $data['belong_cate'] = 'user';      //账单归属：个人
             $manageAccountId = FinanceManageAccountService::userManageAccountId($userId);
         }
         $data['manage_account_id'] = $manageAccountId;
@@ -106,6 +133,10 @@ class FinanceStatementService {
             return false;
         }
         $info = $this->get();
+        $hasConfirm     = Arrays::value($info, 'has_confirm');  //客户已确认
+        if(!$hasConfirm){
+            throw new Exception('请先进行客户确认，才能冲账，对账单号:'.$this->uuid);
+        }
         $customerId     = Arrays::value($info, 'customer_id');
         $userId         = Arrays::value($info, 'user_id');
         $needPayPrize   = Arrays::value($info, 'need_pay_prize');   //正-他欠我，负-我欠他
@@ -233,7 +264,10 @@ class FinanceStatementService {
     public function fId() {
         return $this->getFFieldValue(__FUNCTION__);
     }
-
+    
+    public function fOrderId() {
+        return $this->getFFieldValue(__FUNCTION__);
+    }
     /**
      * 锁定（0：未删，1：已删）
      */
@@ -287,6 +321,10 @@ class FinanceStatementService {
      * 对账单名称
      */
     public function fStatementName() {
+        return $this->getFFieldValue(__FUNCTION__);
+    }
+
+    public function fStatementType() {
         return $this->getFFieldValue(__FUNCTION__);
     }
 

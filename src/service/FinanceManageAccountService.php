@@ -38,6 +38,9 @@ class FinanceManageAccountService {
 
     protected static function manageAccountId($belongTable,$belongTableId,$accountType)
     {
+        if(!$belongTableId){
+            throw new Exception('$belongTableId不可空');
+        }        
         $con[] = ['belong_table','=',$belongTable];
         $con[] = ['belong_table_id','=',$belongTableId];
         $con[] = ['account_type','=',$accountType];

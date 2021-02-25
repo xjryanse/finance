@@ -27,7 +27,7 @@ class FinanceStatementOrderService {
             if( Arrays::value($data, 'change_type') == 2 ){
                 $data['need_pay_prize'] = -1 * abs($needPayPrize);//入账，正值
             }
-        }        
+        }
     }
     
     /**
@@ -55,7 +55,15 @@ class FinanceStatementOrderService {
         $orderId    = Arrays::value( $info , 'order_id');
         //订单的金额更新
         self::orderMoneyUpdate($orderId);
-    }    
+    }  
+    
+    public static function extraDetail(&$item, $uuid) {
+        if(!$item){ return false;}
+        $orderId            = Arrays::value( $item,"order_id" );
+        $item['fGoodsName'] = OrderService::getInstance($orderId)->fGoodsName();
+        return $item;
+    }
+
     /**
      * 订单表的对账字段
      */
