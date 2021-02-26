@@ -22,7 +22,9 @@ class FinanceAccountLogService {
      * 额外输入信息
      */
     public static function extraPreSave(&$data, $uuid) {
-        DataCheck::must($data, ['money','account_id']);
+        $notice['account_id']   = "请选择账户";
+        $notice['money']        = "金额必须";
+        DataCheck::must($data, ['money','account_id'],$notice);
         $customerId     = Arrays::value($data, 'customer_id');  //不一定有
         $userId         = Arrays::value($data, 'user_id');      //不一定有
         $accountId      = Arrays::value($data, 'account_id');
@@ -31,7 +33,10 @@ class FinanceAccountLogService {
         $statementId    = Arrays::value($data, 'statement_id'); //对账单id
         if($statementId && (!$customerId && !$userId)){
             throw new Exception("缺少客户和用户");
-        }        
+        }    
+        if($statementId && self::statementHasLog($statementId)){
+            throw new Exception("该对账单已收款过了，请直接冲账");
+        }
         if($fromTable){
             $service = DbOperate::getService( $fromTable );
             $info = $service::getInstance( $fromTableId )->get(0);
@@ -126,6 +131,16 @@ class FinanceAccountLogService {
         }
         
         return $res;
+    }
+    /**
+     * 对账单是否有收款记录
+     * @param type $statementId
+     * @return type
+     */
+    public static function statementHasLog( $statementId )
+    {
+        $con[] = ['statement_id','=',$statementId];
+        return self::count($con) ? self::find( $con ) : false;
     }
     /**
      * 来源表和来源id查是否有记录：

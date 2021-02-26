@@ -8,6 +8,9 @@ use xjryanse\finance\logic\FinanceIncomeLogic;
 use xjryanse\finance\logic\FinanceIncomePayLogic;
 use xjryanse\finance\service\FinanceIncomePayService;
 use xjryanse\user\service\UserAccountLogService;
+use xjryanse\finance\service\FinanceAccountService;
+use xjryanse\finance\service\FinanceStatementService;
+use xjryanse\finance\service\FinanceAccountLogService;
 use xjryanse\logic\Arrays;
 /**
  * 余额支付逻辑
@@ -19,27 +22,23 @@ class Money extends Base implements UserPayInterface
      * 先生成付款单
      * 微信支付，生成jsapi;
      * 余额支付，直接扣账
-     * @param type $incomeId        收款单id
+     * @param type $statementId     对账单id
      * @param type $thirdPayParam   第三方支付参数
      */
-    public static function pay( $incomeId  ,$thirdPayParam = [])
+    public static function pay( $statementId  ,$thirdPayParam = [])
     {
-        //校验必须
-        $incomeInfo = FinanceIncomeService::getInstance( $incomeId )->get(0);
-        if(!$incomeInfo){
-            return false;
-        }
-        //生成支付单
-        $data['order_id']   = Arrays::value($incomeInfo, 'order_id');
-        $data['pay_by']     = FR_FINANCE_MONEY;
-        $pay = FinanceIncomePayLogic::newPay($incomeInfo['id'], $incomeInfo['money'], $incomeInfo['pay_user_id'], $data );
-        //记录数据
-        $data['from_table'] = FinanceIncomePayService::mainModel()->getTable();
-        $data['from_table_id'] = $pay['id'];
+        $info                   = FinanceStatementService::getInstance( $statementId )->get();
+        $companyId              = Arrays::value($info, 'company_id');
+        $data['user_id']        = Arrays::value($info, 'user_id');
+        $data['customer_id']    = Arrays::value($info, 'customer_id');
+        $data['money']          = Arrays::value($info, 'need_pay_prize');
+        $data['statement_id']   = $statementId;
+        $data['change_type']    = Arrays::value($info, 'change_type');
+        $data['account_id']     = FinanceAccountService::getIdByAccountType($companyId, FR_FINANCE_MONEY );
+        //公司账户进账
+        FinanceAccountLogService::save($data);
         //扣减账户余额
-        $resp = AccountLogic::doOutcome( $incomeInfo['pay_user_id'] , YDZB_USER_ACCOUNT_TYPE_MONEY, $incomeInfo['money'], $data ); 
-        //***********【余额支付，支付完直接执行后续处理】***************//
-        self::afterPay( $pay['id'] );
+        $resp = AccountLogic::doOutcome( $data['user_id'] , FR_FINANCE_MONEY, $data['money'], $data ); 
         return $resp;
     }
     
