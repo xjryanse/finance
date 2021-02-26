@@ -164,6 +164,7 @@ class FinanceStatementService {
         $data['money']          = Arrays::value($info, 'need_pay_prize');
         $data['from_table']     = self::mainModel()->getTable();
         $data['from_table_id']  = $this->uuid;      
+        $data['reason']         = Arrays::value($info, 'statement_name') . ' 冲账';
         //登记冲账
         FinanceManageAccountLogService::save($data);
         $res = self::mainModel()->where('id',$this->uuid)->update(['has_settle'=>1,"account_log_id"=>$accountLogId]);   //更新为已结算

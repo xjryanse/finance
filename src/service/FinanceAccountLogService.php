@@ -103,7 +103,7 @@ class FinanceAccountLogService {
         } else {
             $manageAccountId = FinanceManageAccountService::userManageAccountId($userId);
         }
-        $data2 = Arrays::getByKeys($data, ['money','user_id','account_id','change_type']);
+        $data2 = Arrays::getByKeys($data, ['money','user_id','account_id','change_type','reason']);
         $data2['manage_account_id'] = $manageAccountId;
         $data2['from_table']    = self::mainModel()->getTable();
         $data2['from_table_id'] = $uuid;
