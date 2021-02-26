@@ -29,7 +29,7 @@ class FinanceOutcomeOrderService {
         return round($res, 2);
     }
     
-    public static function save(array $data) {
+    public static function save( $data) {
         $res = self::commSave($data);
         if(isset($data['order_id'])){
             OrderLogic::financeSync($data['order_id']);
