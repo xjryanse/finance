@@ -58,7 +58,6 @@ class FinanceStatementService {
             $data['statement_name'] = self::getStatementNameByOrderId( $data['order_id'] , $cateKey);
         }
         $res = self::commSave($data);
-        dump( $res );
         //转为数组存
         if(is_string($data['order_id'])){
             //单笔订单的存法
