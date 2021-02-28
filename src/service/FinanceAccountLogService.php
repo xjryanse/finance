@@ -63,7 +63,7 @@ class FinanceAccountLogService {
             if( $customerId ){
                 $customerMoney = self::customerMoneyCalc($customerId, $accountId);
                 if( abs($data['money']) > $customerMoney ){
-                    throw new Exception('该客户最多可退￥'.$customerMoney);
+//                    throw new Exception('该客户最多可退￥'.$customerMoney);
                 }
             }
         }

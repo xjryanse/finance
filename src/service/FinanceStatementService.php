@@ -3,6 +3,7 @@
 namespace xjryanse\finance\service;
 
 use xjryanse\logic\Arrays;
+use xjryanse\logic\Debug;
 use xjryanse\order\service\OrderService;
 use xjryanse\system\service\SystemCateService;
 use Exception;
@@ -47,7 +48,8 @@ class FinanceStatementService {
     public static function save( $data )
     {
         self::checkTransaction();
-        if(!Arrays::value($data, 'order_id')){
+        //无单条订单，无订单数组
+        if(!Arrays::value($data, 'order_id') && !Arrays::value($data, 'orders')){
             throw new Exception('请选择订单');
         }
         //转为数组存
@@ -56,12 +58,13 @@ class FinanceStatementService {
             $data['statement_name'] = self::getStatementNameByOrderId( $data['order_id'] , $cateKey);
         }
         $res = self::commSave($data);
+        dump( $res );
         //转为数组存
         if(is_string($data['order_id'])){
             //单笔订单的存法
-            $data['order_id'] = [$data];
+            $data['orders'] = [$data];
         }
-        foreach($data['order_id'] as &$value){
+        foreach($data['orders'] as &$value){
             $value['customer_id']       = Arrays::value($data, 'customer_id');
             $value['statement_id']      = $res['id'];
             $value['statement_cate']    = Arrays::value($res, 'statement_cate');
@@ -93,6 +96,7 @@ class FinanceStatementService {
     }
     
     public static function extraPreSave(&$data, $uuid) {
+        Debug::debug('$data',$data);
         //步骤1
         $needPayPrize = Arrays::value($data, 'need_pay_prize');
         //生成变动类型
@@ -102,6 +106,8 @@ class FinanceStatementService {
         //步骤2
         $customerId   = Arrays::value($data, 'customer_id');        
         $userId       = Arrays::value($data, 'user_id');        
+        Debug::debug('$customerId',$customerId);
+        Debug::debug('$userId',$userId);
         /*管理账户id*/
         if($customerId){
             $data['belong_cate'] = 'customer';  //账单归属：单位
