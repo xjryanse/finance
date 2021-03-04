@@ -49,11 +49,11 @@ class FinanceStatementService {
     {
         self::checkTransaction();
         //无单条订单，无订单数组
-        if(!Arrays::value($data, 'order_id') && !Arrays::value($data, 'orders')){
+        if(!Arrays::value($data, 'order_id') && !Arrays::value($data, 'orders') && !Arrays::value($data, 'statementOrderIds')){
             throw new Exception('请选择订单');
         }
         //转为数组存
-        if(is_string($data['order_id'])){
+        if(is_string($data['order_id']) && $data['order_id']){
             $cateKey            = Arrays::value($data, 'statement_type');
             $data['statement_name'] = self::getStatementNameByOrderId( $data['order_id'] , $cateKey);
         }
@@ -63,16 +63,22 @@ class FinanceStatementService {
             //单笔订单的存法
             $data['orders'] = [$data];
         }
-        foreach($data['orders'] as &$value){
-            $value['customer_id']       = Arrays::value($data, 'customer_id');
-            $value['statement_id']      = $res['id'];
-            $value['statement_cate']    = Arrays::value($res, 'statement_cate');
-//            if(FinanceStatementOrderService::hasStatement( $customerId, $value['order_id'] )){
-//                throw new Exception('订单'.$value['order_id'] .'已经对账过了');
-//            }
-            //一个一个添，有涉及其他表的状态更新
-            FinanceStatementOrderService::save($value);
-        }        
+        //【TODO优化2021-03-03】创建对账订单明细。
+        if(isset($data['orders'])){
+            foreach($data['orders'] as &$value){
+                $value['belong_cate']       = Arrays::value($res, 'belong_cate');
+                $value['user_id']           = Arrays::value($res, 'user_id');
+                $value['manage_account_id'] = Arrays::value($res, 'manage_account_id');
+                $value['customer_id']       = Arrays::value($res, 'customer_id');
+                $value['statement_id']      = $res['id'];
+                $value['statement_cate']    = Arrays::value($res, 'statement_cate');
+    //            if(FinanceStatementOrderService::hasStatement( $customerId, $value['order_id'] )){
+    //                throw new Exception('订单'.$value['order_id'] .'已经对账过了');
+    //            }
+                //一个一个添，有涉及其他表的状态更新
+                FinanceStatementOrderService::save($value);
+            }
+        }
         return $res;
     }
     
@@ -87,14 +93,50 @@ class FinanceStatementService {
         $con[] = ['statement_id','=',$this->uuid];
         $statementOrders = FinanceStatementOrderService::lists( $con );
         foreach( $statementOrders as $value){
-            //一个个删，可能涉及状态更新
-            FinanceStatementOrderService::getInstance($value['id'])->delete();
+            //【TODO】一个个删，可能涉及状态更新
+//            FinanceStatementOrderService::getInstance($value['id'])->delete();
+            //只是把应收的取消了
+            FinanceStatementOrderService::getInstance($value['id'])->cancelStatementId();
         }
 
         return $this->commDelete();
     }
     
     public static function extraPreSave(&$data, $uuid) {
+        //【关联已有对账单明细】
+        if(isset( $data['statementOrderIds'])){
+            //对账订单笔数
+            $statementOrderIdCount = count($data['statementOrderIds']);
+            $cond[] = ['id','in',$data['statementOrderIds']] ;
+            $manageAccountIds = FinanceStatementOrderService::mainModel()->where( $cond )->column('distinct manage_account_id');
+            if(count($manageAccountIds) >1){
+                throw new Exception('请选择同一个客户的账单');
+            }
+            //更新对账单订单的账单id
+            foreach( $data['statementOrderIds'] as $value){
+                //财务账单-订单；
+                FinanceStatementOrderService::getInstance( $value )->setStatementId( $uuid );
+            }
+            //应付金额
+            $data['need_pay_prize']  = FinanceStatementOrderService::mainModel()->where( $cond )->sum('need_pay_prize');
+            //弹一个
+            $statementOrderId = array_pop( $data['statementOrderIds'] );
+            $statementOrderInfo         = FinanceStatementOrderService::getInstance( $statementOrderId )->get(0);
+            $data['customer_id']        = Arrays::value($statementOrderInfo, 'customer_id');
+            $data['belong_cate']        = Arrays::value($statementOrderInfo, 'belong_cate');
+            $data['statement_cate']     = Arrays::value($statementOrderInfo, 'statement_cate');
+            $data['user_id']            = Arrays::value($statementOrderInfo, 'user_id');
+            $data['manage_account_id']  = Arrays::value($statementOrderInfo, 'manage_account_id');
+            $data['statement_name']     = Arrays::value($statementOrderInfo, 'statement_name');
+            $data['busier_id']          = Arrays::value($statementOrderInfo, 'busier_id');
+            if($statementOrderIdCount == 1){
+                $data['order_id']       = Arrays::value($statementOrderInfo, 'order_id');
+            }
+            if($statementOrderIdCount > 1){
+                $data['statement_name'] .= " 等".$statementOrderIdCount."笔";
+            }
+        }
+        
         Debug::debug('$data',$data);
         //步骤1
         $needPayPrize = Arrays::value($data, 'need_pay_prize');
@@ -116,6 +158,13 @@ class FinanceStatementService {
             $manageAccountId = FinanceManageAccountService::userManageAccountId($userId);
         }
         $data['manage_account_id'] = $manageAccountId;
+        //有订单，拿推荐人
+        $orderId = Arrays::value($data, 'order_id');
+        if( $orderId ){
+            $orderInfo = OrderService::getInstance( $orderId )->get(0);
+            $data['order_type'] = Arrays::value( $orderInfo , 'order_type');
+            $data['busier_id']  = Arrays::value( $orderInfo , 'busier_id');
+        }
     }
     
     public static function extraPreUpdate(&$data, $uuid) {
@@ -125,6 +174,17 @@ class FinanceStatementService {
             self::getInstance($uuid)->settle( $accountLogId );
         } else {
             self::getInstance($uuid)->cancelSettle();
+        }
+    }
+    
+    public static function extraAfterUpdate(&$data, $uuid) {
+        if(isset($data['has_confirm'])){
+            $hasConfirm = Arrays::value($data, 'has_confirm');
+            $con[] = ['statement_id','=',$uuid ];
+            $lists = FinanceStatementOrderService::lists( $con );
+            foreach( $lists as $key=>$value){
+                FinanceStatementOrderService::getInstance( $value['id'] )->update( [ 'has_confirm' => $hasConfirm ] );
+            }
         }
     }
 
@@ -256,7 +316,9 @@ class FinanceStatementService {
     public function fHasSettle() {
         return $this->getFFieldValue(__FUNCTION__);
     }
-
+    public function fBusierId() {
+        return $this->getFFieldValue(__FUNCTION__);
+    }
     /**
      * 有使用(0否,1是)
      */

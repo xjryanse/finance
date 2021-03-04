@@ -67,6 +67,10 @@ class FinanceAccountLogService {
                 }
             }
         }
+        $statementId = Arrays::value($data, 'statement_id');
+        if( $statementId ){
+            $data['busier_id'] = FinanceStatementService::getInstance( $statementId )->fBusierId();
+        }
 
         return $data;
     }
@@ -118,6 +122,14 @@ class FinanceAccountLogService {
     public function delete()
     {
         $info = $this->get();
+        if(Arrays::value($info, 'statement_id')){
+            $statementId = Arrays::value($info, 'statement_id');
+            $hasSettle = FinanceStatementService::getInstance( $statementId )->fHasSettle();
+            if( $hasSettle ){
+                throw new Exception('关联账单已入账不可操作');
+            }
+        }
+        
         $res = $this->commDelete();
         //更新账户余额
         FinanceAccountService::getInstance( $info['account_id'])->updateRemainMoney();

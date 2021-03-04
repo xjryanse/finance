@@ -4,6 +4,8 @@ namespace xjryanse\finance\service;
 
 use xjryanse\user\service\UserService;
 use xjryanse\customer\service\CustomerService;
+use xjryanse\logic\Arrays;
+use xjryanse\logic\Debug;
 use Exception;
 
 /**
@@ -16,6 +18,25 @@ class FinanceManageAccountService {
 
     protected static $mainModel;
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceManageAccount';
+    
+    public static function addManageAccountData( &$data )
+    {
+        //步骤2
+        $customerId   = Arrays::value($data, 'customer_id');        
+        $userId       = Arrays::value($data, 'user_id');        
+        Debug::debug('$customerId',$customerId);
+        Debug::debug('$userId',$userId);
+        /*管理账户id*/
+        if($customerId){
+            $data['belong_cate'] = 'customer';  //账单归属：单位
+            $manageAccountId = self::customerManageAccountId($customerId);
+        } else {
+            $data['belong_cate'] = 'user';      //账单归属：个人
+            $manageAccountId = self::userManageAccountId($userId);
+        }
+        $data['manage_account_id'] = $manageAccountId;
+        return $data;
+    }
     
     /**
      * 
@@ -41,7 +62,7 @@ class FinanceManageAccountService {
     {
         if(!$belongTableId){
             throw new Exception('$belongTableId不可空');
-        }        
+        }
         $con[] = ['belong_table','=',$belongTable];
         $con[] = ['belong_table_id','=',$belongTableId];
         $con[] = ['account_type','=',$accountType];

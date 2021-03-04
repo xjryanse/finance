@@ -40,6 +40,20 @@ class FinanceAccountService {
         return $info ? $info['id'] : '';
     }
     
+    public function delete()
+    {
+        $res = $this->commDelete();
+        //删除管理账的明细
+        $con[] = ['account_id','=',$this->uuid];
+        $lists = FinanceAccountLogService::mainModel()->where( $con )->select();
+        foreach($lists as &$v){
+            //一个个删，可能有关联
+            FinanceAccountLogService::getInstance( $v['id'])->delete();
+        }
+        
+        return $res;
+    }    
+    
     /**
      * 入账更新
      */
