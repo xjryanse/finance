@@ -60,8 +60,13 @@ class FinanceStatementOrderService {
         }
         //有否对账单? 1是，0否
         $data['has_statement']          = Arrays::value( $data , 'statement_id') ? 1 : 0;
-        $data['ref_statement_order_id'] = Arrays::value( $data , 'ref_statement_order_id') ? 1 : 0;
-        
+        $data['ref_statement_order_id'] = Arrays::value( $data , 'ref_statement_order_id') ? Arrays::value( $data , 'ref_statement_order_id') : 0;
+        //退款订单
+        if(Arrays::value( $data , 'ref_statement_order_id')){            
+            if(self::mainModel()->where('ref_statement_order_id',Arrays::value( $data , 'ref_statement_order_id'))->find()){
+                self::getInstance( Arrays::value( $data , 'ref_statement_order_id') )->setHasRef();
+            }
+        }        
     }
 
     /**
@@ -78,10 +83,6 @@ class FinanceStatementOrderService {
             OrderService::mainModel()->where('id',$orderId)->update([$orderStatementField=>1]);
             //订单的金额更新
             self::orderMoneyUpdate($orderId);
-        }
-        //退款订单
-        if(Arrays::value( $data , 'ref_statement_order_id')){
-            self::getInstance( Arrays::value( $data , 'ref_statement_order_id') )->setHasRef();
         }
     }
     /**
@@ -106,10 +107,17 @@ class FinanceStatementOrderService {
         self::orderMoneyUpdate($orderId);
         //是退款单的，把退款金额结算一下
         $refStatementOrderId = Arrays::value( $info , 'ref_statement_order_id');
-        if($refStatementOrderId){
+//        dump('$refStatementOrderId');
+//        dump( $refStatementOrderId );
+//        dump( self::mainModel()->where('ref_statement_order_id',$refStatementOrderId)->find() );
+//        dump('$refStatementOrderId-结束');
+        
+        if($refStatementOrderId && self::mainModel()->where('ref_statement_order_id',$refStatementOrderId)->find()){
             $con[] = ['ref_statement_order_id','=',$refStatementOrderId];
             $con[] = ['has_settle','=',1];
             $money = self::sum($con, 'need_pay_prize');
+//            dump('$refStatementOrderId-内部');
+//            dump( $refStatementOrderId );
             //更新退款字段的金额
             self::getInstance( $refStatementOrderId )->update(['ref_prize'=>$money]);   //订单的退款金额
         }
