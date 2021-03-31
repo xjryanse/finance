@@ -22,6 +22,7 @@ class FinanceAccountLogService {
      * 额外输入信息
      */
     public static function extraPreSave(&$data, $uuid) {
+        self::checkTransaction();
         $notice['account_id']   = "请选择账户";
         $notice['money']        = "金额必须";
         DataCheck::must($data, ['money','account_id'],$notice);
@@ -31,6 +32,10 @@ class FinanceAccountLogService {
         $fromTable      = Arrays::value($data, 'from_table');
         $fromTableId    = Arrays::value($data, 'from_table_id');
         $statementId    = Arrays::value($data, 'statement_id'); //对账单id
+        $statementCustomerId = FinanceStatementService::getInstance( $statementId )->fCustomerId();
+        if( $statementId && $customerId !=$statementCustomerId){
+            throw new Exception("收付款客户". $customerId ."与关联账单".$statementId."的客户". $statementCustomerId ."不符");
+        }
         if($statementId && (!$customerId && !$userId)){
             throw new Exception("缺少客户和用户");
         }    
@@ -67,7 +72,6 @@ class FinanceAccountLogService {
                 }
             }
         }
-        $statementId = Arrays::value($data, 'statement_id');
         if( $statementId ){
             $data['busier_id'] = FinanceStatementService::getInstance( $statementId )->fBusierId();
         }
@@ -124,8 +128,8 @@ class FinanceAccountLogService {
         $info = $this->get();
         if(Arrays::value($info, 'statement_id')){
             $statementId = Arrays::value($info, 'statement_id');
-            $hasSettle = FinanceStatementService::getInstance( $statementId )->fHasSettle();
-            if( $hasSettle ){
+            $financeStatement = FinanceStatementService::getInstance( $statementId )->get(0);
+            if( Arrays::value($financeStatement, 'has_settle') ){
                 throw new Exception('关联账单已入账不可操作');
             }
         }

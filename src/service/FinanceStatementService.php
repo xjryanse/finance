@@ -122,6 +122,8 @@ class FinanceStatementService {
             //弹一个
             $statementOrderId = array_pop( $data['statementOrderIds'] );
             $statementOrderInfo         = FinanceStatementOrderService::getInstance( $statementOrderId )->get(0);
+            Debug::debug('FinanceStatementService 的 $statementOrderInfo',$statementOrderInfo);
+
             $data['customer_id']        = Arrays::value($statementOrderInfo, 'customer_id');
             $data['belong_cate']        = Arrays::value($statementOrderInfo, 'belong_cate');
             $data['statement_cate']     = Arrays::value($statementOrderInfo, 'statement_cate');
@@ -176,6 +178,13 @@ class FinanceStatementService {
             self::getInstance($uuid)->cancelSettle();
         }
     }
+    /*
+     * 更新商品名称
+     */
+    public static function extraAfterSave(&$data, $uuid) {
+        $goodsName = FinanceStatementOrderService::statementGoodsName($uuid);
+        return self::mainModel()->where('id',$uuid)->update(['goods_name'=>$goodsName]);
+    }
     
     public static function extraAfterUpdate(&$data, $uuid) {
         if(isset($data['has_confirm'])){
@@ -186,6 +195,9 @@ class FinanceStatementService {
                 FinanceStatementOrderService::getInstance( $value['id'] )->update( [ 'has_confirm' => $hasConfirm ] );
             }
         }
+        //更新商品名称
+        $goodsName = FinanceStatementOrderService::statementGoodsName($uuid);
+        return self::mainModel()->where('id',$uuid)->update(['goods_name'=>$goodsName]);
     }
 
     /**
@@ -213,7 +225,14 @@ class FinanceStatementService {
         }        
         $manageAccountInfo  = FinanceManageAccountService::getInstance( $manageAccountId )->get(0);        
         $manageAccountMoney = Arrays::value($manageAccountInfo, 'money');   //账户余额
-
+        
+        if(!$accountLogId){
+            $con        = [];
+            $con[]      = ['statement_id','=',$this->uuid];
+            $accountLog = FinanceAccountLogService::find( $con );
+            $accountLogId = Arrays::value($accountLog, 'id');
+        }
+        
         if($needPayPrize > 0){
             $data['change_type'] = 2;   //客户出账，我进账，客户金额越来越少
             if($manageAccountMoney<$needPayPrize && !$accountLogId){
@@ -232,7 +251,11 @@ class FinanceStatementService {
         $data['reason']         = Arrays::value($info, 'statement_name') . ' 冲账';
         //登记冲账
         FinanceManageAccountLogService::save($data);
-        $res = self::mainModel()->where('id',$this->uuid)->update(['has_settle'=>1,"account_log_id"=>$accountLogId]);   //更新为已结算
+        $stateData['has_settle'] = 1;
+        if( $accountLogId ){
+            $stateData['account_log_id'] = $accountLogId;
+        }
+        $res = self::mainModel()->where('id',$this->uuid)->update( $stateData );   //更新为已结算
         //冗余
         $con[] = ['statement_id','=',$this->uuid];
         $lists = FinanceStatementOrderService::lists( $con );
@@ -255,10 +278,18 @@ class FinanceStatementService {
             //一个个删，可能关联其他的删除
             FinanceManageAccountLogService::getInstance($v['id'])->delete();
         }
-        
+        //步骤2：
         $res = self::mainModel()->where('id',$this->uuid)->update(['has_settle'=>0,"account_log_id"=>""]);   //更新为未结算
         //冗余
         FinanceStatementOrderService::mainModel()->where('statement_id',$this->uuid)->update(['has_settle'=>0]);   //更新为未结算
+        
+        //步骤3：【关联删入账】20210319关联删入账
+        $con2[] = ['statement_id','=',$this->uuid];
+        $listsAccountLog = FinanceAccountLogService::lists( $con2 );
+        foreach( $listsAccountLog as $v){
+            //一个个删，可能关联其他的删除
+            FinanceAccountLogService::getInstance($v['id'])->delete();
+        }
         return $res;
     }
     /**

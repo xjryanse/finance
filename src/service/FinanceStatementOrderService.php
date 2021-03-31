@@ -17,14 +17,27 @@ class FinanceStatementOrderService {
     protected static $mainModel;
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceStatementOrder';
 
+    /**
+     * 对账单商品id
+     */
+    public static function statementGoodsName( $statementId )
+    {
+        $con[]      = ['statement_id','=',$statementId];
+        $orderIds   = FinanceStatementOrderService::column('order_id',$con);
+        $con1[]     = ['id','in',$orderIds];
+        $goodsName  = OrderService::column('goods_name',$con1);
+        return implode(',', $goodsName);
+    }
+    
     public static function extraPreSave(&$data, $uuid) {
         $keys   = ['order_id','need_pay_prize','statement_cate','statement_type'];
         $notices['order_id']          = '订单id必须';        
         $notices['need_pay_prize']    = '金额必须';        
-        $notices['statement_cate']    = '对账分类';        
-        $notices['statement_type']    = '费用类型';        
+        $notices['statement_cate']    = '对账分类必须';        
+        $notices['statement_type']    = '费用类型必须';        
         DataCheck::must($data, $keys,$notices);
-
+        //账单名称：20210319
+        $data['statement_name'] = FinanceStatementService::getStatementNameByOrderId( $data['order_id'] , $data['statement_type']);
         $needPayPrize = Arrays::value($data, 'need_pay_prize');
         if(!Arrays::value($data, 'change_type')){
             $data['change_type'] =  $needPayPrize >= 0 ? 1 : 2;
