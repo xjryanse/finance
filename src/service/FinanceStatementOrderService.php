@@ -16,6 +16,26 @@ class FinanceStatementOrderService {
 
     protected static $mainModel;
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceStatementOrder';
+    
+    /**
+     * 清除未处理的账单
+     * 一般用于订单取消，撤销全部的订单
+     * ！！【未测】20210402
+     */
+    public static function clearOrderNoDeal( $orderId )
+    {
+        self::checkTransaction();
+        if(!$orderId){
+            throw new Exception('订单id必须');
+        }
+        $con[] = ['order_id','=',$orderId];
+        $con[] = ['has_statement','=',0];   //未出账单
+        $con[] = ['has_settle','=',0];      //未结算
+        $lists = self::mainModel()->where( $con )->select();
+        foreach( $lists as $k=>$v){
+            self::getInstance( $v['id'])->delete();
+        }
+    }
 
     /**
      * 对账单商品id
@@ -238,6 +258,10 @@ class FinanceStatementOrderService {
         $con4[] = ['statement_cate','=','seller'];  //卖家，入账
         $con4[] = ['change_type','=','1'];
         $data["outcome_refund_prize"]  = self::orderSettleMoneyCalc( $orderId, $con4 );
+        //其他成本
+        $con5[] = ['statement_cate','=','cost'];  //卖家，入账
+//        $con4[] = ['change_type','=','1'];
+        $data["cost_prize"]  = self::orderSettleMoneyCalc( $orderId, $con5 );
         //毛利
         $data["final_prize"]    = self::orderSettleMoneyCalc( $orderId );
         //更新金额
