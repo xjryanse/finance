@@ -3,8 +3,9 @@
 namespace xjryanse\finance\service;
 
 use xjryanse\logic\Arrays;
-use xjryanse\order\service\OrderService;
 use xjryanse\logic\DataCheck;
+use xjryanse\logic\Debug;
+use xjryanse\order\service\OrderService;
 use Exception;
 /**
  * 收款单-订单关联
@@ -128,7 +129,17 @@ class FinanceStatementOrderService {
         $hasRef = $count ? 1 : 0 ; 
         $this->update(['has_ref'=>$hasRef]);
     }
-    
+    /**
+     * 根据订单id和价格key，查已结算价格
+     */
+    public static function hasSettleMoney( $orderId, $prizeKeys )
+    {
+        $con[] = ['order_id','=',$orderId];
+        $con[] = ['statement_type','in',$prizeKeys];
+        $con[] = ['has_settle','=',1];
+        
+        return self::sum($con, 'need_pay_prize');
+    }
     /**
      * 额外输入信息
      */
@@ -154,6 +165,10 @@ class FinanceStatementOrderService {
             //更新退款字段的金额
             self::getInstance( $refStatementOrderId )->update(['ref_prize'=>$money]);   //订单的退款金额
         }
+        if(Arrays::value( $data , 'has_settle') == 1){
+            //重新校验未结账单的金额，20210407
+            self::reCheckNoSettle($orderId);
+        }
     }  
     
     public static function extraDetail(&$item, $uuid) {
@@ -161,6 +176,32 @@ class FinanceStatementOrderService {
         $orderId            = Arrays::value( $item,"order_id" );
         $item['fGoodsName'] = OrderService::getInstance($orderId)->fGoodsName();
         return $item;
+    }
+    
+    /**
+     * 重新校验未结算账单的金额
+     * （进行修改）
+     */
+    public static function reCheckNoSettle( $orderId )
+    {
+        $con[] = ['order_id','=',$orderId];
+        $con[] = ['has_settle','=',0];
+        $lists = self::lists( $con );
+        foreach( $lists as $value){
+            Debug::debug('reCheckNoSettle的循环value',$value);
+            $prize       = OrderService::getInstance( $orderId )->prizeKeyGetPrize( $value['statement_type'] );
+            //更新未结账单金额
+            if($prize){
+                self::getInstance( $value['id'])->update(['need_pay_prize'=>$prize]);
+                Debug::debug('reCheckNoSettle的循环$prize',$prize);
+            } else {
+                //【没有价格】：直接把账单删了；加个锁
+                $delCon     = [];
+                $delCon[]   = ['id','=',$value['id']];
+                $delCon[]   = ['has_settle','=',0];
+                self::mainModel()->where( $delCon )->delete();
+            }
+        }
     }
     /**
      * 空账单设定对账单id
