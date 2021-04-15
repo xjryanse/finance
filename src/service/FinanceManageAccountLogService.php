@@ -44,6 +44,17 @@ class FinanceManageAccountLogService {
         $customerMoney      = self::moneyCalc( $manageAccountId );
         FinanceManageAccountService::mainModel()->where('id',$manageAccountId)->update(['money'=>$customerMoney]);        
     }
+    /**
+     * 
+     * @param type $data
+     * @param type $uuid
+     */
+    public static function extraAfterUpdate(&$data, $uuid) {
+        $info = self::getInstance($uuid)->get();
+        $manageAccountId    = Arrays::value($info, 'manage_account_id');
+        $customerMoney      = self::moneyCalc( $manageAccountId );
+        FinanceManageAccountService::mainModel()->where('id',$manageAccountId)->update(['money'=>$customerMoney]);        
+    }
     
     public function delete()
     {
