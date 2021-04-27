@@ -1,9 +1,8 @@
 <?php
 namespace xjryanse\finance\logic;
 
-use xjryanse\finance\service\FinanceIncomeService;
 use xjryanse\finance\service\FinanceIncomePayService;
-use xjryanse\logic\SnowFlake;
+use xjryanse\finance\service\FinanceStatementService;
 use Exception;
 /**
  * 支付单逻辑
@@ -23,18 +22,18 @@ class FinanceIncomePayLogic
         //校验事务
         FinanceIncomePayService::checkTransaction();
         //收款单信息
-        $incomeInfo     = FinanceIncomeService::getInstance( $incomeId )->get(0);
+        $incomeInfo     = FinanceStatementService::getInstance( $incomeId )->get(0);
         if( !$incomeInfo ){
             throw new Exception( '收款单'.$incomeId.'不存在' );
         }
-        if( $incomeInfo['money'] != $money ){
-            throw new Exception( '收款单'.$incomeId.'金额'.$incomeInfo['money'].'与申请支付金额'.$money .'不匹配');
+        if( $incomeInfo['need_pay_prize'] != $money ){
+            throw new Exception( '收款单'.$incomeId.'金额'.$incomeInfo['need_pay_prize'].'与申请支付金额'.$money .'不匹配');
         }
-        if( $incomeInfo['income_status'] != XJRYANSE_OP_TODO ){
-            throw new Exception( '收款单' . $incomeId .'非待收款状态');
+        if( $incomeInfo['has_settle'] != 0 ){
+            throw new Exception( '收款单' . $incomeId .'非待结算状态');
         }
         //支付单号
-        $data['id']             = SnowFlake::generateParticle();
+        $data['id']             = FinanceIncomePayService::mainModel()->newId();
         $data['income_pay_sn']  = "PAY".$data['id'];
         $data['income_id']      = $incomeId;
         $data['user_id']        = $userId;

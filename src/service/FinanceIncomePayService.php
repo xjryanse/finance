@@ -20,8 +20,8 @@ class FinanceIncomePayService {
 
     public static function extraPreSave(&$data, $uuid) {
         if(Arrays::value($data, 'income_id')){
-            $data['order_id']       = FinanceIncomeService::getInstance($data['income_id'])->fOrderId();
-            $data['customer_id']    = FinanceIncomeService::getInstance($data['income_id'])->fCustomerId();
+            $data['order_id']       = FinanceStatementService::getInstance($data['income_id'])->fOrderId();
+            $data['customer_id']    = FinanceStatementService::getInstance($data['income_id'])->fCustomerId();
         }
         return $data;
     }

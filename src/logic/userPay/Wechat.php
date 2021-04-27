@@ -2,7 +2,7 @@
 namespace xjryanse\finance\logic\userPay;
 
 use xjryanse\finance\interfaces\UserPayInterface;
-use xjryanse\finance\service\FinanceIncomeService;
+use xjryanse\finance\service\FinanceStatementService;
 use xjryanse\finance\service\FinanceIncomePayService;
 use xjryanse\finance\logic\FinanceIncomePayLogic;
 use xjryanse\finance\logic\FinanceIncomeLogic;
@@ -23,12 +23,12 @@ class Wechat extends Base implements UserPayInterface
      * 余额支付，直接扣账
      * @param type $incomeId    收款单id
      */
-    public static function pay( $incomeId ,$thirdPayParam=[])
+    public static function pay( $statementId ,$thirdPayParam=[])
     {
         //必传参数
         DataCheck::must($thirdPayParam, ['wePubAppId','openid']);
         //校验必须
-        $incomeInfo = FinanceIncomeService::getInstance( $incomeId )->get(0);
+        $incomeInfo = FinanceStatementService::getInstance( $statementId )->get();
         if(!$incomeInfo){
             return false;
         }
@@ -36,11 +36,12 @@ class Wechat extends Base implements UserPayInterface
         $data['order_id']   = Arrays::value($incomeInfo, 'order_id');
         $data['pay_by']     = FR_FINANCE_MONEY;
         //生成支付单
-        $pay = FinanceIncomePayLogic::newPay($incomeInfo['id'], $incomeInfo['money'], $incomeInfo['pay_user_id'], $data);
+        $pay = FinanceIncomePayLogic::newPay($incomeInfo['id'], $incomeInfo['need_pay_prize'], $incomeInfo['user_id'], $data);
         //支付单
         $WxPayLogic         = new WxPayLogic($thirdPayParam['wePubAppId'], $thirdPayParam['openid'] );
-        $attach             = ['finance_id'=>$incomeInfo['id']];  //收款单信息扔到附加数据
-        $wxPayJsApiOrder    = $WxPayLogic->getWxPayJsApiOrder($pay['income_pay_sn'], $incomeInfo['money'], '店铺升级',json_encode($attach));        
+        $attach             = ['statement_id'=>$incomeInfo['id']];  //收款单信息扔到附加数据
+        $wxPayJsApiOrder    = $WxPayLogic->getWxPayJsApiOrder($pay['income_pay_sn'], $incomeInfo['need_pay_prize'], '店铺升级',json_encode($attach));    
+        $wxPayJsApiOrder['pay_id'] = Arrays::value($pay, 'id');
         return $wxPayJsApiOrder;
     }
     

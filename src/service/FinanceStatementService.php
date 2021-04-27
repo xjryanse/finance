@@ -25,16 +25,8 @@ class FinanceStatementService {
         foreach( $res['data'] as $key=>$value){
             $sumCurrent += $value['need_pay_prize'];
         }
-        //【全部合计】
-        //默认带数据权限
-        $conAll = array_merge( $con ,self::commCondition() );
-        //如果数据权限没记录，尝试去除数据权限进行搜索
-        $count = self::mainModel()->where( $conAll )->count();
-        //有条件才进行搜索：20210326
-        if(!$count && $con){
-            $conAll = array_merge( $con ,self::commCondition( false ));
-        }        
-        $sumTotal = self::sum( $conAll, 'need_pay_prize');
+
+        $sumTotal = self::sum( $res['con'], 'need_pay_prize');
         //统计数据描述
         $res['staticsDescribe'] = "本页合计：".$sumCurrent."，全部合计：".$sumTotal;
 

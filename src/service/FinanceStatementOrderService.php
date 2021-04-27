@@ -196,8 +196,10 @@ class FinanceStatementOrderService {
                 Debug::debug('reCheckNoSettle的循环$prize',$prize);
             } else {
                 //【没有价格】：直接把账单删了；加个锁
+                // 20210424 测试到手工录入的价格bug，增加“未出账单”条件
                 $delCon     = [];
                 $delCon[]   = ['id','=',$value['id']];
+                $delCon[]   = ['has_statement','=',0];    //未出账单
                 $delCon[]   = ['has_settle','=',0];
                 self::mainModel()->where( $delCon )->delete();
             }
