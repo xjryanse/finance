@@ -89,8 +89,9 @@ class FinanceAccountLogService {
         $fromTable      = Arrays::value($data, 'from_table');
         $fromTableId    = Arrays::value($data, 'from_table_id');
         $statementId    = Arrays::value($data, 'statement_id'); //对账单id
+
         if( $statementId && FinanceStatementService::getInstance($statementId)->fHasSettle() ){
-            throw new Exception('账单已结算');            
+            throw new Exception('账单'.$statementId.'已结算');            
         }
         
         if( $fromTable ){
@@ -120,6 +121,10 @@ class FinanceAccountLogService {
         //【对账单id】（如有关联对账单id，进行对冲结算）
         if($statementId){
             FinanceStatementService::getInstance($statementId)->update(['has_settle'=>1,"account_log_id"=>$uuid]);
+            //20210429添加，TODO校验影响
+            $con    = [];
+            $con[]  = ['statement_id','=',$statementId];
+            FinanceStatementOrderService::mainModel()->where($con)->update(['has_settle'=>1]);
         }
     }
     

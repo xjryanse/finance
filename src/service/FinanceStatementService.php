@@ -189,6 +189,14 @@ class FinanceStatementService {
             $data['order_type'] = Arrays::value( $orderInfo , 'order_type');
             $data['busier_id']  = Arrays::value( $orderInfo , 'busier_id');
         }
+        //20210430 客户的应付、供应商的应收，为退款;1应收，2应付
+        if((Arrays::value($data, 'change_type') == '1' && Arrays::value($data, 'statement_cate')=='seller')
+                || (Arrays::value($data, 'change_type') == '2' && Arrays::value($data, 'statement_cate')=='buyer') ){
+            $data['is_ref'] = 1;
+            $data['statement_name'] = '退款 '.$data['statement_name'];
+        } else {
+            $data['is_ref'] = 0;
+        }
     }
     
     public static function extraPreUpdate(&$data, $uuid) {
@@ -314,6 +322,31 @@ class FinanceStatementService {
         }
         return $res;
     }
+    /**
+     * 退款账单自动关联一笔付款账单
+     */
+    public function refUni()
+    {
+        $info = $this->get();
+        if($info['ref_statement_id']){
+            return false;
+        }
+        if(!$info['order_id']){
+            throw new Exception('仅支持单订单账单');
+        }
+        //剩余金额大于等于当前账单金额，且金额从小到大排列，取第一条记录
+        $con[] = ['order_id','=',$info['order_id']];
+        $con[] = ['is_ref','=',0];  //非退款订单
+        $con[] = ['statement_cate','=',$info['statement_cate']];
+        $con[] = ['remainPrize','>=',$info['need_pay_prize']];      //虚拟计算字段，版本5.7以上
+        $incomeInfo = self::mainModel()->where( $con )->find();
+        if(!$incomeInfo){
+            throw new Exception('没有匹配的付款账单');
+        }
+        $data['ref_statement_id'] = $incomeInfo['id'];
+        $this->update( $data );
+    }
+    
     /**
      *
      */
