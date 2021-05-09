@@ -9,7 +9,7 @@ use xjryanse\finance\logic\FinanceIncomeLogic;
 use xjryanse\wechat\service\WechatWxPayLogService;
 use xjryanse\logic\Arrays;
 use xjryanse\logic\DataCheck;
-use app\webapi\logic\pay\WxPayLogic;
+use xjryanse\wechat\WxPay\WxPayLogic;
 
 /**
  * 微信支付
