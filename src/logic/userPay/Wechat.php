@@ -62,4 +62,29 @@ class Wechat extends Base implements UserPayInterface
         }
         return $incomePayId;        
     }
+    /**
+     * 退款
+     * @param type $statementId
+     */
+    public static function ref( $statementId ,$thirdPayParam=[])
+    {
+        //必传参数
+        DataCheck::must($thirdPayParam, ['wePubAppId','openid']);
+        
+        $statementInfo      = FinanceStatementService::getInstance( $statementId )->get();
+        $payStatementId     = Arrays::value($statementInfo, 'ref_statement_id');        
+        $payStatementInfo   = FinanceStatementService::getInstance( $payStatementId )->get();
+        if(!$payStatementInfo){
+            throw new Exception('原支付单'.$payStatementId.'不存在');
+        }
+        $param["out_refund_no"] = Arrays::value($statementInfo, 'id');                   //退款单号
+        $param["out_trade_no"]  = Arrays::value($statementInfo, 'ref_statement_id');     //原支付订单号
+        $param["total_fee"]     = abs($payStatementInfo['need_pay_prize']) * 100;   //订单总额（分）
+        $param["refund_fee"]    = abs($statementInfo['need_pay_prize']) * 100; //退款金额（分）
+
+        $WxPayLogic         = new WxPayLogic($thirdPayParam['wePubAppId'], $thirdPayParam['openid'] );
+
+        $res = $WxPayLogic->doRefund( $param );
+        return $res;
+    }
 }

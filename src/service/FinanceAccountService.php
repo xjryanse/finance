@@ -2,6 +2,7 @@
 
 namespace xjryanse\finance\service;
 
+use think\Db;
 /**
  * 账户表
  */

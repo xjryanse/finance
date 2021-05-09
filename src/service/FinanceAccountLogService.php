@@ -6,6 +6,7 @@ use xjryanse\logic\Arrays;
 use xjryanse\logic\DbOperate;
 use xjryanse\logic\DataCheck;
 use xjryanse\customer\service\CustomerService;
+use think\Db;
 use Exception;
 /**
  * 账户流水表
@@ -138,7 +139,13 @@ class FinanceAccountLogService {
                 throw new Exception('关联账单已入账不可操作');
             }
         }
-        
+        //来源表有记录，则报错
+        if($info['from_table'] && $info['from_table_id']){
+            if( Db::table($info['from_table'])->where('id',$info['from_table_id'])->find() ){
+                throw new Exception('请先删除'.$info['from_table'].'表,id为'.$info['from_table_id'].'的记录');
+            }
+        }
+
         $res = $this->commDelete();
         //更新账户余额
         FinanceAccountService::getInstance( $info['account_id'])->updateRemainMoney();

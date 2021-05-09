@@ -2,7 +2,6 @@
 namespace xjryanse\finance\logic\userPay;
 
 use xjryanse\finance\interfaces\UserPayInterface;
-use xjryanse\finance\service\FinanceIncomeService;
 use xjryanse\user\logic\AccountLogic;
 use xjryanse\finance\logic\FinanceIncomeLogic;
 use xjryanse\finance\logic\FinanceIncomePayLogic;
@@ -12,6 +11,7 @@ use xjryanse\finance\service\FinanceAccountService;
 use xjryanse\finance\service\FinanceStatementService;
 use xjryanse\finance\service\FinanceAccountLogService;
 use xjryanse\logic\Arrays;
+use think\Db;
 /**
  * 余额支付逻辑
  */
@@ -61,4 +61,23 @@ class Money extends Base implements UserPayInterface
         return $incomePayId;
     }
 
+    /**
+     * 退款
+     * @param type $statementId
+     */
+    public static function ref( $statementId ,$thirdPayParam=[])
+    {
+        $statementInfo      = FinanceStatementService::getInstance( $statementId )->get();
+        $payStatementId     = Arrays::value($statementInfo, 'ref_statement_id');        
+        $payStatementInfo   = FinanceStatementService::getInstance( $payStatementId )->get();
+        if(!$payStatementInfo){
+            throw new Exception('原支付单'.$payStatementId.'不存在');
+        }
+        $data['statement_id'] = $statementId;
+        //用户账户余额添加一条入账记录
+        Db::startTrans();
+        $res = UserAccountLogService::doIncome($statementInfo['user_id'], 'money', abs($statementInfo['need_pay_prize']),$data);
+        Db::commit();
+        return $res;
+    }    
 }
