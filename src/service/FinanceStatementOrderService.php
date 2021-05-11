@@ -100,7 +100,10 @@ class FinanceStatementOrderService {
             if(self::mainModel()->where('ref_statement_order_id',Arrays::value( $data , 'ref_statement_order_id'))->find()){
                 self::getInstance( Arrays::value( $data , 'ref_statement_order_id') )->setHasRef();
             }
-        }        
+        }
+        $source = OrderService::getInstance($orderId)->fSource();
+        //对账单分组
+        $data['group'] = $source == 'admin' ? "offline" : "online";        
     }
 
     /**
@@ -190,11 +193,13 @@ class FinanceStatementOrderService {
         foreach( $lists as $value){
             Debug::debug('reCheckNoSettle的循环value',$value);
             $prize       = OrderService::getInstance( $orderId )->prizeKeyGetPrize( $value['statement_type'] );
+            Debug::debug('reCheckNoSettle的循环$prize',$prize);
             //更新未结账单金额
             if($prize){
                 self::getInstance( $value['id'])->update(['need_pay_prize'=>$prize]);
                 Debug::debug('reCheckNoSettle的循环$prize',$prize);
-            } else {
+            } else if( $value['is_ref'] == 0 ){
+                //20210511 线上退款bug，增加退款不删
                 //【没有价格】：直接把账单删了；加个锁
                 // 20210424 测试到手工录入的价格bug，增加“未出账单”条件
                 $delCon     = [];
