@@ -40,14 +40,16 @@ class FinanceStatementService {
     public static function getStatementNameByOrderId( $orderId, $statementType )
     {
         //商品名称加上价格的名称
+        $fGoodsCate         = OrderService::getInstance( $orderId )->fGoodsCate();
+        $statementName      = $fGoodsCate ? $fGoodsCate.'-' : '';
         $fGoodsName         = OrderService::getInstance( $orderId )->fGoodsName();
         $cateKey            = $statementType;
         $keyId              = SystemCateService::keyGetId('prizeKeyAll', $cateKey);      //prizeKeyAll，全部的价格key
         if($keyId){
             //处理对账单名称
-            $statementName = $fGoodsName ." ". SystemCateService::getInstance($keyId)->fCateName();
+            $statementName .= $fGoodsName ." ". SystemCateService::getInstance($keyId)->fCateName();
         } else {
-            $statementName = $fGoodsName;
+            $statementName .= $fGoodsName;
         }
         return $statementName;
     }
@@ -196,6 +198,11 @@ class FinanceStatementService {
             $data['statement_name'] = '退款 '.$data['statement_name'];
         } else {
             $data['is_ref'] = 0;
+        }
+        if($orderId){
+            $source = OrderService::getInstance($orderId)->fSource();
+            //对账单分组
+            $data['group'] = $source == 'admin' ? "offline" : "online";        
         }
     }
     

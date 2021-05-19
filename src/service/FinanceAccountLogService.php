@@ -6,6 +6,7 @@ use xjryanse\logic\Arrays;
 use xjryanse\logic\DbOperate;
 use xjryanse\logic\DataCheck;
 use xjryanse\customer\service\CustomerService;
+use xjryanse\logic\Debug;
 use think\Db;
 use Exception;
 /**
@@ -24,6 +25,7 @@ class FinanceAccountLogService {
      */
     public static function extraPreSave(&$data, $uuid) {
         self::checkTransaction();
+        Debug::debug('保存信息',$data);
         $notice['account_id']   = "请选择账户";
         $notice['money']        = "金额必须";
         DataCheck::must($data, ['money','account_id'],$notice);
@@ -38,7 +40,7 @@ class FinanceAccountLogService {
             throw new Exception("收付款客户". $customerId ."与关联账单".$statementId."的客户". $statementCustomerId ."不符");
         }
         if($statementId && (!$customerId && !$userId)){
-            throw new Exception("缺少客户和用户");
+            throw new Exception("缺少客户".$customerId."和用户".$userId. json_encode($data));
         }    
         if($statementId && self::statementHasLog($statementId)){
             throw new Exception("该对账单已收款过了，请直接冲账");

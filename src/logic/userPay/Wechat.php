@@ -40,7 +40,8 @@ class Wechat extends Base implements UserPayInterface
         //支付单
         $WxPayLogic         = new WxPayLogic($thirdPayParam['wePubAppId'], $thirdPayParam['openid'] );
         $attach             = ['statement_id'=>$incomeInfo['id']];  //收款单信息扔到附加数据
-        $wxPayJsApiOrder    = $WxPayLogic->getWxPayJsApiOrder($pay['income_pay_sn'], $incomeInfo['need_pay_prize'], '店铺升级',json_encode($attach));    
+        // 20210519 改income_pay_sn 为income_id
+        $wxPayJsApiOrder    = $WxPayLogic->getWxPayJsApiOrder($pay['income_id'], $incomeInfo['need_pay_prize'], $incomeInfo['statement_name'],json_encode($attach));    
         $wxPayJsApiOrder['pay_id'] = Arrays::value($pay, 'id');
         return $wxPayJsApiOrder;
     }
@@ -82,6 +83,7 @@ class Wechat extends Base implements UserPayInterface
         $param["total_fee"]     = abs($payStatementInfo['need_pay_prize']) * 100;   //订单总额（分）
         $param["refund_fee"]    = abs($statementInfo['need_pay_prize']) * 100; //退款金额（分）
 
+//        $param["out_trade_no"]  = 'PAY5206678365661663232';     //原支付订单号
         $WxPayLogic         = new WxPayLogic($thirdPayParam['wePubAppId'], $thirdPayParam['openid'] );
 
         $res = $WxPayLogic->doRefund( $param );
