@@ -58,6 +58,7 @@ class FinanceStatementOrderService {
         $notices['statement_type']    = '费用类型必须';        
         DataCheck::must($data, $keys,$notices);
         //账单名称：20210319
+        $data['company_id']    = OrderService::getInstance($data['order_id'])->fCompanyId();
         $data['statement_name'] = FinanceStatementService::getStatementNameByOrderId( $data['order_id'] , $data['statement_type']);
         $needPayPrize = Arrays::value($data, 'need_pay_prize');
         if(!Arrays::value($data, 'change_type')){
@@ -94,9 +95,9 @@ class FinanceStatementOrderService {
         }
         //有否对账单? 1是，0否
         $data['has_statement']          = Arrays::value( $data , 'statement_id') ? 1 : 0;
-        $data['ref_statement_order_id'] = Arrays::value( $data , 'ref_statement_order_id') ? Arrays::value( $data , 'ref_statement_order_id') : 0;
+        $data['ref_statement_order_id'] = Arrays::value( $data , 'ref_statement_order_id') ? Arrays::value( $data , 'ref_statement_order_id') : '';
         //退款订单
-        if(Arrays::value( $data , 'ref_statement_order_id')){            
+        if(Arrays::value( $data , 'ref_statement_order_id')){
             if(self::mainModel()->where('ref_statement_order_id',Arrays::value( $data , 'ref_statement_order_id'))->find()){
                 self::getInstance( Arrays::value( $data , 'ref_statement_order_id') )->setHasRef();
             }
@@ -206,7 +207,8 @@ class FinanceStatementOrderService {
                 $delCon[]   = ['id','=',$value['id']];
                 $delCon[]   = ['has_statement','=',0];    //未出账单
                 $delCon[]   = ['has_settle','=',0];
-                self::mainModel()->where( $delCon )->delete();
+                // TODO 延长定金有bug，暂时隐藏20210520，再考虑收公证定金的情况【】
+//                self::mainModel()->where( $delCon )->delete();
             }
         }
     }

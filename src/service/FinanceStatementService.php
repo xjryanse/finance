@@ -40,9 +40,10 @@ class FinanceStatementService {
     public static function getStatementNameByOrderId( $orderId, $statementType )
     {
         //商品名称加上价格的名称
-        $fGoodsCate         = OrderService::getInstance( $orderId )->fGoodsCate();
+        $orderInfo          = OrderService::getInstance( $orderId )->get(0);
+        $fGoodsCate         = Arrays::value($orderInfo, 'goods_cate');
         $statementName      = $fGoodsCate ? $fGoodsCate.'-' : '';
-        $fGoodsName         = OrderService::getInstance( $orderId )->fGoodsName();
+        $fGoodsName         = Arrays::value($orderInfo, 'goods_name');
         $cateKey            = $statementType;
         $keyId              = SystemCateService::keyGetId('prizeKeyAll', $cateKey);      //prizeKeyAll，全部的价格key
         if($keyId){
