@@ -36,9 +36,14 @@ class Money extends Base implements UserPayInterface
         $data['change_type']    = Arrays::value($info, 'change_type');
         $data['account_id']     = FinanceAccountService::getIdByAccountType($companyId, FR_FINANCE_MONEY );
         //公司账户进账
-        FinanceAccountLogService::save($data);
+        $res = FinanceAccountLogService::save($data);
         //扣减账户余额
         $resp = AccountLogic::doOutcome( $data['user_id'] , FR_FINANCE_MONEY, $data['money'], $data ); 
+        //更新来源表，和来源表id
+        $updData['from_table']     = UserAccountLogService::mainModel()->getTable();
+        $updData['from_table_id']  = $resp['id'];
+        FinanceAccountLogService::getInstance($res['id'])->update( $updData );
+
         return $resp;
     }
     
