@@ -6,6 +6,7 @@ use xjryanse\logic\Arrays;
 use xjryanse\logic\Debug;
 use xjryanse\order\service\OrderService;
 use xjryanse\system\service\SystemCateService;
+use think\Db;
 use Exception;
 /**
  * 收款单-订单关联
@@ -17,6 +18,32 @@ class FinanceStatementService {
     protected static $mainModel;
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceStatement';
 
+    /**
+     * 根据订单明细id，生成账单
+     * @param type $statementOrderIds   账单订单表的id
+     * @return type
+     */
+    public static function statementGenerate($statementOrderIds = [])
+    {
+        //字符串数组都可以传
+        $data['statementOrderIds']  = $statementOrderIds 
+                ? (is_array($statementOrderIds) ? $statementOrderIds: [$statementOrderIds])
+                : [];
+        $data['has_confirm']        = 1;    //默认已确认
+        $orderIds = FinanceStatementOrderService::column('distinct order_id',[['id','in',$statementOrderIds]]);
+        $source = OrderService::mainModel()->where([['id','in',$orderIds]])->column('distinct source');
+        if(in_array('admin',$source)){
+            $data['group'] = 'offline'; //线下
+        } else {
+            $data['group'] = 'online';  //线上
+        }
+        
+        Db::startTrans();
+        $res = FinanceStatementService::save( $data );
+        Db::commit();
+        return $res;
+    }
+    
     public static function paginate( $con = [],$order='',$perPage=10,$having = '')
     {
         $res = self::commPaginate($con, $order, $perPage, $having);
@@ -336,6 +363,7 @@ class FinanceStatementService {
     public function refUni()
     {
         $info = $this->get();
+        Debug::debug('退款账单信息',$info);        
         if($info['ref_statement_id']){
             return false;
         }

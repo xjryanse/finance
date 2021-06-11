@@ -3,6 +3,7 @@
 namespace xjryanse\finance\service;
 
 use think\Db;
+use Exception;
 /**
  * 账户表
  */
@@ -41,20 +42,16 @@ class FinanceAccountService {
         return $info ? $info['id'] : '';
     }
     
-    public function delete()
+    public function extraPreDelete()
     {
-        $res = $this->commDelete();
-        //删除管理账的明细
+        self::checkTransaction();
         $con[] = ['account_id','=',$this->uuid];
-        $lists = FinanceAccountLogService::mainModel()->where( $con )->select();
-        foreach($lists as &$v){
-            //一个个删，可能有关联
-            FinanceAccountLogService::getInstance( $v['id'])->delete();
+        $res = FinanceAccountLogService::mainModel()->where($con)->count(1);
+        if($res){
+            throw new Exception('该账户有流水，不可删除');
         }
+    }
         
-        return $res;
-    }    
-    
     /**
      * 入账更新
      */
