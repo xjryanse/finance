@@ -38,7 +38,7 @@ class UserPayLogic
     }
     
     /**
-     * 收款单id进行支付操作
+     * 收款单id进行退款
      * @param type $statementId     收款单id
      * @param type $payBy           用啥支付
      * @param type $thirdPayParam   用于传第三方支付所需参数
@@ -49,5 +49,27 @@ class UserPayLogic
         //动态执行各支付方式的映射类库
         $res = call_user_func([self::$baseNamespace. ucfirst($payBy), 'ref'],$statementId, $thirdPayParam);
         return $res;
-    }    
+    }
+    
+    /**
+     * 账单id进行收款操作
+     * @param type $statementId     收款单id
+     * @param type $payBy           用啥支付
+     * @param type $thirdPayParam   用于传第三方支付所需参数
+     * @return type
+     */
+    public static function collect( $statementId , $payBy ,$thirdPayParam = [])
+    {
+        //动态执行各支付方式的映射类库
+        $res = call_user_func( [self::$baseNamespace. ucfirst( $payBy ), 'collect'] , $statementId, $thirdPayParam );
+        return $res;
+    }
+    /**
+     * 用户分账收款（目前只支持微信）
+     */
+    public static function secCollect ( $statementId , $payBy ,$thirdPayParam = []){
+        //动态执行各支付方式的映射类库
+        $res = call_user_func([self::$baseNamespace. ucfirst($payBy), 'secCollect'],$statementId, $thirdPayParam);
+        return $res;
+    }
 }

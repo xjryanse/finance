@@ -6,10 +6,14 @@ use xjryanse\finance\service\FinanceStatementService;
 use xjryanse\finance\service\FinanceIncomePayService;
 use xjryanse\finance\logic\FinanceIncomePayLogic;
 use xjryanse\finance\logic\FinanceIncomeLogic;
+use xjryanse\system\service\SystemCompanyService;
+use xjryanse\wechat\service\WechatWePubService;
 use xjryanse\wechat\service\WechatWxPayLogService;
+use xjryanse\wechat\service\WechatWePubFansUserService;
 use xjryanse\logic\Arrays;
 use xjryanse\logic\DataCheck;
 use xjryanse\wechat\WxPay\WxPayLogic;
+use Exception;
 
 /**
  * 微信支付
@@ -41,8 +45,9 @@ class Wechat extends Base implements UserPayInterface
         $WxPayLogic         = new WxPayLogic($thirdPayParam['wePubAppId'], $thirdPayParam['openid'] );
         $attach             = ['statement_id'=>$incomeInfo['id']];  //收款单信息扔到附加数据
         // 20210519 改income_pay_sn 为income_id
-        $wxPayJsApiOrder    = $WxPayLogic->getWxPayJsApiOrder($pay['income_id'], $incomeInfo['need_pay_prize'], $incomeInfo['statement_name'],json_encode($attach));    
-        $wxPayJsApiOrder['pay_id'] = Arrays::value($pay, 'id');
+        $wxPayJsApiOrder    = $WxPayLogic->getWxPayJsApiOrder($pay['income_id'], $incomeInfo['need_pay_prize'], $incomeInfo['statement_name'],json_encode($attach));
+        $wxPayJsApiOrder['pay_id']      = Arrays::value($pay, 'id');
+        $wxPayJsApiOrder['order_id']    = Arrays::value($incomeInfo, 'order_id');
         return $wxPayJsApiOrder;
     }
     
@@ -87,6 +92,54 @@ class Wechat extends Base implements UserPayInterface
         $WxPayLogic         = new WxPayLogic($thirdPayParam['wePubAppId'], $thirdPayParam['openid'] );
 
         $res = $WxPayLogic->doRefund( $param );
+        return $res;
+    }
+    
+    public static function secCollect( $statementId ,$thirdPayParam=[])
+    {
+        //①取账单信息和公众号信息
+        $statementInfo = FinanceStatementService::getInstance($statementId)->get();
+        $companyId  = Arrays::value($statementInfo, 'company_id');
+        $wePubId    = SystemCompanyService::getInstance($companyId)->fWePubId();
+        $wePubInfo  = WechatWePubService::getInstance( $wePubId )->get();
+        //②取账单对应的粉丝信息
+        $cond   = [];
+        $cond[] = ['user_id','=',Arrays::value($statementInfo, 'user_id')];
+        $WechatWePubFansUserInfo    = WechatWePubFansUserService::mainModel()->where($cond)->find();
+        if(!$WechatWePubFansUserInfo){
+            throw new Exception('未找到用户'.Arrays::value($statementInfo, 'user_id').'绑定的微信公众号粉丝信息');
+        }
+        //③相同 订单id，取买方账单。
+        $con    = [];
+        $con[]  = ['order_id','=',Arrays::value($statementInfo, 'order_id')];
+        $con[]  = ['statement_cate','=','buyer'];
+        $con[]  = ['change_type','=',1];
+        $buyerStatementInfo = FinanceStatementService::find( $con );
+        if(!$buyerStatementInfo){
+            throw new Exception('未找到订单'.Arrays::value($statementInfo, 'order_id').'对应的买方账单');
+        }
+        //④买方账单到微信支付表取支付流水，拿到 transaction_id；
+        $conPay     = [];
+        $conPay[]   = ['statement_id','=',$buyerStatementInfo['id']];
+        $wxPayLogInfo = WechatWxPayLogService::mainModel()->where( $conPay )->find();
+        if(!$wxPayLogInfo){
+            throw new Exception('账单'.$buyerStatementInfo['id'].'没有微信支付流水');
+        }
+        //⑤组装数据
+        $wePubAppId = Arrays::value($wePubInfo, 'appid');
+        $openid     = Arrays::value($WechatWePubFansUserInfo, 'openid');
+        $WxPayLogic = new WxPayLogic( $wePubAppId, $openid );
+        
+        $input['transaction_id']    = Arrays::value($wxPayLogInfo, 'transaction_id');
+        $input['out_order_no']      = $statementId;
+        $receivers[] = [
+            "type"          =>"PERSONAL_OPENID",
+            "account"       =>$openid,
+            "amount"        =>intval(abs(Arrays::value($statementInfo, 'need_pay_prize') * 100)),
+            "description"   =>Arrays::value($statementInfo, 'statement_name'),
+        ];
+        //执行分账
+        $res = $WxPayLogic->secProfitSharing( $input, $receivers );
         return $res;
     }
 }

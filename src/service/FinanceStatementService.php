@@ -6,6 +6,9 @@ use xjryanse\logic\Arrays;
 use xjryanse\logic\Debug;
 use xjryanse\order\service\OrderService;
 use xjryanse\system\service\SystemCateService;
+use xjryanse\goods\service\GoodsPrizeKeyService;
+use xjryanse\finance\service\FinanceStatementOrderService;
+use xjryanse\finance\logic\UserPayLogic;
 use think\Db;
 use Exception;
 /**
@@ -18,6 +21,55 @@ class FinanceStatementService {
     protected static $mainModel;
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceStatement';
 
+    /**
+     * 直冲用户账户（微信分账，用户余额）
+     * 
+     */
+    public function doDirect(){
+        $con    = [];
+        $con[]  = ['statement_id','=',$this->uuid];
+        $statementOrderInfoCount = FinanceStatementOrderService::count($con);
+        if(!$statementOrderInfoCount){
+            throw new Exception("账单".$this->uuid."没有账单明细");
+        }
+        if($statementOrderInfoCount > 1){
+            throw new Exception("不支持多明细账单直接结算".$this->uuid."共计".$statementOrderInfoCount."笔");
+        }
+        $statementOrderInfo = FinanceStatementOrderService::find( $con );
+        $goodsPrizeInfo         = GoodsPrizeKeyService::getByPrizeKey( Arrays::value( $statementOrderInfo, 'statement_type') );  //价格key取归属
+        //如果是充值到余额的，直接处理
+        if( Arrays::value($goodsPrizeInfo,'to_money') == "money" ){
+            //收款操作
+            return UserPayLogic::collect( $this->uuid, FR_FINANCE_MONEY );
+        }
+        //如果是分账的，也直接处理
+        if( Arrays::value($goodsPrizeInfo,'to_money') == "sec_share" ){
+            return UserPayLogic::secCollect( $this->uuid, FR_FINANCE_WECHAT );
+        }
+    }
+    
+    /**
+     * 清除未处理的账单
+     * 一般用于订单取消，撤销全部的订单
+     * ！！【未测】20210402
+     */
+    public static function clearOrderNoDeal( $orderId )
+    {
+        self::checkTransaction();
+        if(!$orderId){
+            throw new Exception('订单id必须');
+        }
+        $con[] = ['order_id','=',$orderId];
+        $con[] = ['has_settle','=',0];      //未结算
+        $lists = self::mainModel()->where( $con )->select();
+        foreach( $lists as $k=>$v){
+            //设为未对账
+            self::getInstance( $v['id'])->update(['has_confirm'=>0]);
+            //然后才能删
+            self::getInstance( $v['id'])->delete();
+        }
+    }
+    
     /**
      * 根据订单明细id，生成账单
      * @param type $statementOrderIds   账单订单表的id

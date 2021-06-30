@@ -11,6 +11,7 @@ use xjryanse\finance\service\FinanceAccountService;
 use xjryanse\finance\service\FinanceStatementService;
 use xjryanse\finance\service\FinanceAccountLogService;
 use xjryanse\logic\Arrays;
+use Exception;
 use think\Db;
 /**
  * 余额支付逻辑
@@ -72,17 +73,36 @@ class Money extends Base implements UserPayInterface
      */
     public static function ref( $statementId ,$thirdPayParam=[])
     {
+        //退款校验
         $statementInfo      = FinanceStatementService::getInstance( $statementId )->get();
         $payStatementId     = Arrays::value($statementInfo, 'ref_statement_id');        
         $payStatementInfo   = FinanceStatementService::getInstance( $payStatementId )->get();
         if(!$payStatementInfo){
             throw new Exception('原支付单'.$payStatementId.'不存在');
         }
+        return self::income($statementId, $thirdPayParam);
+    }
+    /**
+     * 收款
+     */
+    public static function collect($statementId ,$thirdPayParam=[])
+    {
+        return self::income($statementId, $thirdPayParam);
+    }
+    /**
+     * 收入
+     */
+    protected static function income( $statementId )
+    {
+        $statementInfo      = FinanceStatementService::getInstance( $statementId )->get();
         $data['statement_id'] = $statementId;
+        $data['from_table'] = FinanceStatementService::mainModel()->getTable();
+        $data['from_table_id'] = $statementId;
+        $data['change_reason'] = $statementInfo['statement_name'];
         //用户账户余额添加一条入账记录
         Db::startTrans();
         $res = UserAccountLogService::doIncome($statementInfo['user_id'], 'money', abs($statementInfo['need_pay_prize']),$data);
         Db::commit();
         return $res;
-    }    
+    }
 }

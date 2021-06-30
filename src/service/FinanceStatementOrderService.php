@@ -38,6 +38,15 @@ class FinanceStatementOrderService {
         }
     }
 
+    public function extraPreDelete()
+    {
+        self::checkTransaction();
+        $info = $this->get();
+        if($info['has_statement'] || $info['statement_id']){
+            throw new Exception('该明细已生成账单，请先删除账单');
+        }
+    }
+
     /**
      * 对账单商品id
      */
@@ -63,6 +72,9 @@ class FinanceStatementOrderService {
         $needPayPrize = Arrays::value($data, 'need_pay_prize');
         if(!Arrays::value($data, 'change_type')){
             $data['change_type'] =  $needPayPrize >= 0 ? 1 : 2;
+        } else {
+            //处理一下正负号
+            $data['need_pay_prize'] = $data['change_type'] == 1 ?  abs($needPayPrize) : -1 * abs($needPayPrize);
         }
         if(Arrays::value($data, 'change_type')){
             if( Arrays::value($data, 'change_type') == 1 ){
@@ -90,6 +102,18 @@ class FinanceStatementOrderService {
             if($statementCate == "seller"){
                 $data['customer_id']    = Arrays::value( $orderInfo , 'seller_customer_id');
                 $data['user_id']        = Arrays::value( $orderInfo , 'seller_user_id');
+                FinanceManageAccountService::addManageAccountData($data);
+            }
+            //推荐人
+            if($statementCate == "rec_user" && Arrays::value( $orderInfo , 'rec_user_id')){
+                $data['customer_id']    = '';
+                $data['user_id']        = Arrays::value( $orderInfo , 'rec_user_id');
+                FinanceManageAccountService::addManageAccountData($data);
+            }
+            //业务员
+            if($statementCate == "busier" && Arrays::value( $orderInfo , 'busier_id')){
+                $data['customer_id']    = '';
+                $data['user_id']        = Arrays::value( $orderInfo , 'busier_id');
                 FinanceManageAccountService::addManageAccountData($data);
             }
         }
@@ -173,7 +197,7 @@ class FinanceStatementOrderService {
             //重新校验未结账单的金额，20210407
             self::reCheckNoSettle($orderId);
         }
-    }  
+    }
     
     public static function extraDetail(&$item, $uuid) {
         if(!$item){ return false;}
@@ -274,7 +298,7 @@ class FinanceStatementOrderService {
             self::getInstance( Arrays::value( $info , 'ref_statement_order_id') )->setHasRef();
         }
         return $res;
-    }    
+    }
     
     /**
      * 统计订单已付金额
