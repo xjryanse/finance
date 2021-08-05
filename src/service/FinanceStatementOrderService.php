@@ -72,9 +72,6 @@ class FinanceStatementOrderService {
         $needPayPrize = Arrays::value($data, 'need_pay_prize');
         if(!Arrays::value($data, 'change_type')){
             $data['change_type'] =  $needPayPrize >= 0 ? 1 : 2;
-        } else {
-            //处理一下正负号
-            $data['need_pay_prize'] = $data['change_type'] == 1 ?  abs($needPayPrize) : -1 * abs($needPayPrize);
         }
         if(Arrays::value($data, 'change_type')){
             if( Arrays::value($data, 'change_type') == 1 ){
