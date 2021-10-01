@@ -18,6 +18,8 @@ class FinanceManageAccountService {
 
     protected static $mainModel;
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceManageAccount';
+    //直接执行后续触发动作
+    protected static $directAfter = true;    
     
     public static function addManageAccountData( &$data )
     {
@@ -68,6 +70,7 @@ class FinanceManageAccountService {
         $con[] = ['account_type','=',$accountType];
         $info = self::find( $con );
         if(!$info){
+            $data['company_id']       = session(SESSION_COMPANY_ID);
             $data['belong_table']     = $belongTable;
             $data['belong_table_id']  = $belongTableId;
             $data['account_type']   = $accountType;

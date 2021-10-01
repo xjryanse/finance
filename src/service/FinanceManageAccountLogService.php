@@ -14,6 +14,8 @@ class FinanceManageAccountLogService {
 
     protected static $mainModel;
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceManageAccountLog';
+    //直接执行后续触发动作
+    protected static $directAfter = true;    
     
     public static function extraPreSave(&$data, $uuid) {
         DataCheck::must($data, ['manage_account_id']);  //money可能存在为0的情况

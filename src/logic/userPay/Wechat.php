@@ -27,8 +27,13 @@ class Wechat extends Base implements UserPayInterface
      * 余额支付，直接扣账
      * @param type $incomeId    收款单id
      */
-    public static function pay( $statementId ,$thirdPayParam=[])
+    public static function pay( $statementId , $money,$thirdPayParam=[])
     {
+        //未结金额
+        $remainMoney            = FinanceStatementService::getInstance($statementId)->remainMoney();
+        if($money > abs($remainMoney)){
+            throw new Exception('支付金额异常'.$money.'-'.abs($remainMoney));
+        }
         //必传参数
         DataCheck::must($thirdPayParam, ['wePubAppId','openid']);
         //校验必须
@@ -40,14 +45,13 @@ class Wechat extends Base implements UserPayInterface
         $data['order_id']   = Arrays::value($incomeInfo, 'order_id');
         $data['pay_by']     = FR_FINANCE_MONEY;
         //生成支付单
-        $pay = FinanceIncomePayLogic::newPay($incomeInfo['id'], $incomeInfo['need_pay_prize'], $incomeInfo['user_id'], $data);
+        $pay = FinanceIncomePayLogic::newPay($incomeInfo['id'], $money, $incomeInfo['user_id'], $data);
         //支付单
         $WxPayLogic         = new WxPayLogic($thirdPayParam['wePubAppId'], $thirdPayParam['openid'] );
         $attach             = ['statement_id'=>$incomeInfo['id']];  //收款单信息扔到附加数据
         // 20210519 改income_pay_sn 为income_id
-        $wxPayJsApiOrder    = $WxPayLogic->getWxPayJsApiOrder($pay['income_id'], $incomeInfo['need_pay_prize'], $incomeInfo['statement_name'],json_encode($attach));
-        $wxPayJsApiOrder['pay_id']      = Arrays::value($pay, 'id');
-        $wxPayJsApiOrder['order_id']    = Arrays::value($incomeInfo, 'order_id');
+        $wxPayJsApiOrder    = $WxPayLogic->getWxPayJsApiOrder($pay['income_id'], $money, $incomeInfo['statement_name'],json_encode($attach));    
+        $wxPayJsApiOrder['pay_id'] = Arrays::value($pay, 'id');
         return $wxPayJsApiOrder;
     }
     

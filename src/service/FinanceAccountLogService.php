@@ -19,6 +19,8 @@ class FinanceAccountLogService {
 
     protected static $mainModel;
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceAccountLog';
+    //直接执行后续触发动作
+    protected static $directAfter = true;    
     
     /**
      * 额外输入信息
@@ -75,10 +77,11 @@ class FinanceAccountLogService {
                 }
             }
         }
+        Debug::debug('$statementId',$statementId);
         if( $statementId ){
             $data['busier_id'] = FinanceStatementService::getInstance( $statementId )->fBusierId();
         }
-
+        
         return $data;
     }
     
@@ -129,6 +132,14 @@ class FinanceAccountLogService {
             $con[]  = ['statement_id','=',$statementId];
             FinanceStatementOrderService::mainModel()->where($con)->update(['has_settle'=>1]);
         }
+        
+        Debug::debug('$statementId',$statementId);
+        if( $statementId ){
+            $data['busier_id'] = FinanceStatementService::getInstance( $statementId )->fBusierId();
+            //触发关联订单动作
+            Debug::debug('FinanceAccountLogService触发关联订单动作',$statementId);
+            FinanceStatementOrderService::statementIdTriggerOrderFlow($statementId);
+        }
     }
     
     public function delete()
@@ -171,6 +182,15 @@ class FinanceAccountLogService {
     {
         $con[] = ['statement_id','=',$statementId];
         return self::count($con) ? self::find( $con ) : false;
+    }
+    
+    /**
+     * 账单已完结金额;
+     * 适用于组合支付中查询金额进行处理
+     */
+    public static function statementFinishMoney( $statementId ){
+        $con[] = ['statement_id','=',$statementId];
+        return self::sum($con,'money');
     }
     /**
      * 来源表和来源id查是否有记录：

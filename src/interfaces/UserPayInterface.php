@@ -13,7 +13,7 @@ interface UserPayInterface
      * 余额支付，直接扣账
      * @param type $incomeId    收款单id
      */
-    public static function pay( $incomeId ,$thirdPayParam=[] );
+    public static function pay( $incomeId ,$money,$thirdPayParam=[] );
     
     /**
      * 付款完成后续处理

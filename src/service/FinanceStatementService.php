@@ -8,7 +8,10 @@ use xjryanse\order\service\OrderService;
 use xjryanse\system\service\SystemCateService;
 use xjryanse\goods\service\GoodsPrizeKeyService;
 use xjryanse\finance\service\FinanceStatementOrderService;
+use xjryanse\finance\service\FinanceAccountLogService;
 use xjryanse\finance\logic\UserPayLogic;
+use xjryanse\wechat\service\WechatWxPayConfigService;
+use xjryanse\wechat\service\WechatWxPayLogService;
 use think\Db;
 use Exception;
 /**
@@ -20,7 +23,24 @@ class FinanceStatementService {
 
     protected static $mainModel;
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceStatement';
-
+    //直接执行后续触发动作
+    protected static $directAfter = true;
+    
+    /**
+     * 获取账单未结清的金额
+     * 一般用于组合支付中进行业务逻辑处理
+     */
+    public function remainMoney(){
+        $info = $this->get();
+        // 总金额
+        $totalMoney     = $info['need_pay_prize'];
+        // 已结清金额
+        $finishMoney    = FinanceAccountLogService::statementFinishMoney( $this->uuid );
+        // -300 -50
+        // 解决浮点数运算TODO更优？
+        return (intval( $totalMoney * 100 ) - intval( $finishMoney * 100)) * 0.01;
+    }
+    
     /**
      * 直冲用户账户（微信分账，用户余额）
      * 
@@ -69,7 +89,7 @@ class FinanceStatementService {
             self::getInstance( $v['id'])->delete();
         }
     }
-    
+
     /**
      * 根据订单明细id，生成账单
      * @param type $statementOrderIds   账单订单表的id
@@ -235,9 +255,9 @@ class FinanceStatementService {
             $data['manage_account_id']  = Arrays::value($statementOrderInfo, 'manage_account_id');
             $data['statement_name']     = Arrays::value($statementOrderInfo, 'statement_name');
             $data['busier_id']          = Arrays::value($statementOrderInfo, 'busier_id');
-            if($statementOrderIdCount == 1){
-                $data['order_id']       = Arrays::value($statementOrderInfo, 'order_id');
-            }
+            //if($statementOrderIdCount == 1){
+            $data['order_id']       = Arrays::value($statementOrderInfo, 'order_id');
+            //}
             if($statementOrderIdCount > 1){
                 $data['statement_name'] .= " 等".$statementOrderIdCount."笔";
             }
@@ -419,6 +439,9 @@ class FinanceStatementService {
         if($info['ref_statement_id']){
             return false;
         }
+        if(!$info['is_ref']){
+            throw new Exception($this->uuid.'不是退款账单');
+        }
         if(!$info['order_id']){
             throw new Exception('仅支持单订单账单');
         }
@@ -433,6 +456,49 @@ class FinanceStatementService {
         }
         $data['ref_statement_id'] = $incomeInfo['id'];
         $this->update( $data );
+    }
+    /**
+     * 通过微信渠道进行退款；
+     * 需要原付款单通过微信支付
+     */
+    public function refWxPay(){
+        //关联一下付款账单
+        Db::startTrans();
+        $this->refUni(); 
+        Db::commit();
+        //从主库读取数据
+        $info = self::mainModel()->master()->get($this->uuid);
+        if(!$info['order_id']){
+            throw new Exception('线上退款仅支持单订单，请重新生成对账单');
+        }
+        if(!$info['ref_statement_id']){
+            throw new Exception($this->uuid.'未指定原付款账单');
+        }
+        $payInfo    = self::getInstance( $info['ref_statement_id'] )->get(0);
+        if(!$payInfo['account_log_id']){
+            throw new Exception($this->uuid.'原付款账单无支付流水记录');
+        }
+        //原付款单的支付记录
+        $payLogInfo = FinanceAccountLogService::getInstance( $payInfo['account_log_id'] )->get(0);
+        if($payLogInfo['from_table'] != "w_wechat_wx_pay_log"){
+            throw new Exception('原付款账单非微信支付，不可使用微信支付渠道退款');
+        }
+        $con    = [];
+        $con[]  = ['company_id','=',$info['company_id']];
+        $payConf = WechatWxPayConfigService::mainModel()->where( $con )->find();
+        //TODO待调整20210225
+        $thirdPayParam['wePubAppId']    = Arrays::value($payConf, 'AppId');
+        $thirdPayParam['openid']        = WechatWxPayLogService::getInstance($payLogInfo['from_table_id'])->fOpenid();
+        //国通支付
+        //执行退款操作
+        $ress                = UserPayLogic::ref($this->uuid, FR_FINANCE_WECHAT, $thirdPayParam);
+        
+        if($ress['return_code'] == 'SUCCESS' && $ress['result_code'] == 'SUCCESS'){
+            return $ress;
+        } else {
+            $errMsg = $ress['return_msg'] == 'OK' ? $ress['err_code_des'] : $ress['return_msg'];
+            throw new Exception('退款渠道报错：'.$errMsg);
+        }
     }
     
     /**

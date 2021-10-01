@@ -14,6 +14,8 @@ class FinanceAccountService {
 
     protected static $mainModel;
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceAccount';
+    //直接执行后续触发动作
+    protected static $directAfter = true;    
     
     /*
      * 用户id和账户类型创建，一个类型只能有一个账户

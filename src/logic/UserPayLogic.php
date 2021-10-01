@@ -16,10 +16,11 @@ class UserPayLogic
      * @param type $thirdPayParam   用于传第三方支付所需参数
      * @return type
      */
-    public static function pay( $incomeId , $payBy ,$thirdPayParam = [])
+    public static function pay( $incomeId , $money , $payBy ,$thirdPayParam = [])
     {
         //动态执行各支付方式的映射类库
-        $res = call_user_func([self::$baseNamespace. ucfirst($payBy), 'pay'],$incomeId, $thirdPayParam);
+        //20210924，增加$money兼容组合支付
+        $res = call_user_func([self::$baseNamespace. ucfirst($payBy), 'pay'],$incomeId, $money , $thirdPayParam);
         return $res;
     }
     /**

@@ -26,18 +26,27 @@ class Money extends Base implements UserPayInterface
      * @param type $statementId     对账单id
      * @param type $thirdPayParam   第三方支付参数
      */
-    public static function pay( $statementId  ,$thirdPayParam = [])
+    public static function pay( $statementId ,$money ,$thirdPayParam = [])
     {
-        $info                   = FinanceStatementService::getInstance( $statementId )->get();
+        //未结金额
+        $remainMoney            = FinanceStatementService::getInstance($statementId)->remainMoney();
+        if($money > abs($remainMoney)){
+            throw new Exception('支付金额异常'.$money.'-'.abs($remainMoney));
+        }        
+        $info                   = FinanceStatementService::getInstance( $statementId )->get(MASTER_DATA);
         $companyId              = Arrays::value($info, 'company_id');
         $data['user_id']        = Arrays::value($info, 'user_id');
         $data['customer_id']    = Arrays::value($info, 'customer_id');
-        $data['money']          = Arrays::value($info, 'need_pay_prize');
+        $data['money']          = $money;
         $data['statement_id']   = $statementId;
         $data['change_type']    = Arrays::value($info, 'change_type');
         $data['account_id']     = FinanceAccountService::getIdByAccountType($companyId, FR_FINANCE_MONEY );
         //公司账户进账
         $res = FinanceAccountLogService::save($data);
+        //写入账户表的额外记录
+        $data['change_reason']  = Arrays::value($info, 'statement_name');
+        $data['from_table']     = FinanceStatementService::mainModel()->getTable();
+        $data['from_table_id']  = $statementId;
         //扣减账户余额
         $resp = AccountLogic::doOutcome( $data['user_id'] , FR_FINANCE_MONEY, $data['money'], $data ); 
         //更新来源表，和来源表id
