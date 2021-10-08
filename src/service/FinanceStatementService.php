@@ -5,7 +5,6 @@ namespace xjryanse\finance\service;
 use xjryanse\logic\Arrays;
 use xjryanse\logic\Debug;
 use xjryanse\order\service\OrderService;
-use xjryanse\system\service\SystemCateService;
 use xjryanse\goods\service\GoodsPrizeKeyService;
 use xjryanse\finance\service\FinanceStatementOrderService;
 use xjryanse\finance\service\FinanceAccountLogService;
@@ -20,11 +19,31 @@ use Exception;
 class FinanceStatementService {
     use \xjryanse\traits\InstTrait;
     use \xjryanse\traits\MainModelTrait;
-
+    use \xjryanse\traits\ObjectAttrTrait;
+    
     protected static $mainModel;
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceStatement';
     //直接执行后续触发动作
     protected static $directAfter = true;
+    
+    ///从ObjectAttrTrait中来
+    // 定义对象的属性
+    protected $objAttrs = [];
+    // 定义对象是否查询过的属性
+    protected $hasObjAttrQuery = [];
+    // 定义对象属性的配置数组
+    protected static $objAttrConf = [
+        'financeStatementOrder'=>[
+            'class'     =>'\\xjryanse\\finance\\service\\FinanceStatementOrderService',
+            'keyField'  =>'statement_id',
+            'master'    =>true
+        ],
+        'financeAccountLog'=>[
+            'class'     =>'\\xjryanse\\finance\\service\\FinanceAccountLogService',
+            'keyField'  =>'statement_id',
+            'master'    =>true
+        ]
+    ];
     
     /**
      * 获取账单未结清的金额
@@ -143,14 +162,8 @@ class FinanceStatementService {
         $fGoodsCate         = Arrays::value($orderInfo, 'goods_cate');
         $statementName      = $fGoodsCate ? $fGoodsCate.'-' : '';
         $fGoodsName         = Arrays::value($orderInfo, 'goods_name');
-        $cateKey            = $statementType;
-        $keyId              = SystemCateService::keyGetId('prizeKeyAll', $cateKey);      //prizeKeyAll，全部的价格key
-        if($keyId){
-            //处理对账单名称
-            $statementName .= $fGoodsName ." ". SystemCateService::getInstance($keyId)->fCateName();
-        } else {
-            $statementName .= $fGoodsName;
-        }
+        $goodsPrizeInfo     = GoodsPrizeKeyService::getByPrizeKey($statementType);
+        $statementName      .= $fGoodsName ." ". Arrays::value($goodsPrizeInfo, 'prize_name');
         return $statementName;
     }
     
@@ -177,13 +190,13 @@ class FinanceStatementService {
             throw new Exception('请选择订单');
         }
         //转为数组存
-        if(is_string($data['order_id']) && $data['order_id']){
+        if(is_string(Arrays::value($data, 'order_id')) && Arrays::value($data, 'order_id')){
             $cateKey            = Arrays::value($data, 'statement_type');
             $data['statement_name'] = self::getStatementNameByOrderId( $data['order_id'] , $cateKey);
         }
         $res = self::commSave($data);
         //转为数组存
-        if(is_string($data['order_id'])){
+        if(is_string(Arrays::value($data, 'order_id')) && Arrays::value($data, 'order_id')){
             //单笔订单的存法
             $data['orders'] = [$data];
         }
@@ -236,6 +249,7 @@ class FinanceStatementService {
             if(count($manageAccountIds) >1){
                 throw new Exception('请选择同一个客户的账单');
             }
+            $data['goods_name'] = FinanceStatementOrderService::statementOrderGoodsName($data['statementOrderIds']);            
             //更新对账单订单的账单id
             foreach( $data['statementOrderIds'] as $value){
                 //财务账单-订单；
@@ -307,34 +321,59 @@ class FinanceStatementService {
     }
     
     public static function extraPreUpdate(&$data, $uuid) {
-        $hasSettle      = Arrays::value($data, 'has_settle');
-        $accountLogId   = Arrays::value($data, 'account_log_id');
-        if( $hasSettle ){
-            self::getInstance($uuid)->settle( $accountLogId );
-        } else {
-            self::getInstance($uuid)->cancelSettle();
+        $info = self::getInstance($uuid)->get();
+        $hasSettleRaw   = Arrays::value($info, 'has_settle');
+        if(isset($data['has_settle']) && $hasSettleRaw != $data['has_settle'] ){
+            if( $data['has_settle'] ){
+                $accountLogId   = Arrays::value($data, 'account_log_id');
+                self::getInstance($uuid)->settle( $accountLogId );
+            } else {
+                self::getInstance($uuid)->cancelSettle();
+            }
         }
+//        
+//        $hasSettleNew   = Arrays::value($data, 'has_settle');
+//        $accountLogId   = Arrays::value($data, 'account_log_id');
+//        if( $hasSettle ){
+//            self::getInstance($uuid)->settle( $accountLogId );
+//        } else {
+//            self::getInstance($uuid)->cancelSettle();
+//        }
     }
     /*
      * 更新商品名称
      */
     public static function extraAfterSave(&$data, $uuid) {
-        $goodsName = FinanceStatementOrderService::statementGoodsName($uuid);
-        return self::mainModel()->where('id',$uuid)->update(['goods_name'=>$goodsName]);
+//        $goodsName = FinanceStatementOrderService::statementGoodsName($uuid);
+//        return self::mainModel()->where('id',$uuid)->update(['goods_name'=>$goodsName]);
     }
     
     public static function extraAfterUpdate(&$data, $uuid) {
-        if(isset($data['has_confirm'])){
-            $hasConfirm = Arrays::value($data, 'has_confirm');
-            $con[] = ['statement_id','=',$uuid ];
-            $lists = FinanceStatementOrderService::lists( $con );
-            foreach( $lists as $key=>$value){
-                FinanceStatementOrderService::getInstance( $value['id'] )->update( [ 'has_confirm' => $hasConfirm ] );
-            }
-        }
+//        if(isset($data['has_confirm'])){
+//            $upData['has_confirm'] = Arrays::value($data, 'has_confirm');
+//        }
+//        if(isset($data['has_settle'])){
+//            $upData['has_settle'] = Arrays::value($data, 'has_settle');
+//        }
+//        $con[] = ['statement_id','=',$uuid ];
+//        FinanceStatementOrderService::mainModel()->where($con)->update($upData);
+        
+        
+//        foreach( $lists as $value){
+//            FinanceStatementOrderService::getInstance( $value['id'] )->update( $upData );
+//        }
+//        
+//        if(isset($data['has_confirm'])){
+//            $hasConfirm = Arrays::value($data, 'has_confirm');
+//            $con[] = ['statement_id','=',$uuid ];
+//            $lists = FinanceStatementOrderService::lists( $con );
+//            foreach( $lists as $key=>$value){
+//                FinanceStatementOrderService::getInstance( $value['id'] )->update( [ 'has_confirm' => $hasConfirm ] );
+//            }
+//        }
         //更新商品名称
-        $goodsName = FinanceStatementOrderService::statementGoodsName($uuid);
-        return self::mainModel()->where('id',$uuid)->update(['goods_name'=>$goodsName]);
+//        $goodsName = FinanceStatementOrderService::statementGoodsName($uuid);
+//        return self::mainModel()->where('id',$uuid)->update(['goods_name'=>$goodsName]);
     }
 
     /**
@@ -393,12 +432,14 @@ class FinanceStatementService {
             $stateData['account_log_id'] = $accountLogId;
         }
         $res = self::mainModel()->where('id',$this->uuid)->update( $stateData );   //更新为已结算
-        //冗余
-        $con[] = ['statement_id','=',$this->uuid];
-        $lists = FinanceStatementOrderService::lists( $con );
-        foreach( $lists as $v){
-            FinanceStatementOrderService::getInstance( $v['id'] )->update(['has_settle'=>1]);   //更新为已结算
-        }
+//        //冗余
+//        $con[] = ['statement_id','=',$this->uuid];
+//        $lists = FinanceStatementOrderService::lists( $con );
+//        foreach( $lists as $v){
+//            FinanceStatementOrderService::getInstance( $v['id'] )->update(['has_settle'=>1]);   //更新为已结算
+//        }
+        $con[] = ['statement_id','=',$this->uuid ];
+        FinanceStatementOrderService::mainModel()->where($con)->update(['has_settle'=>1]);
         return $res;
     }
     

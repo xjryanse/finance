@@ -7,6 +7,7 @@ use xjryanse\logic\Arrays2d;
 use xjryanse\logic\DataCheck;
 use xjryanse\logic\Debug;
 use xjryanse\order\service\OrderService;
+use xjryanse\order\service\OrderGoodsService;
 use xjryanse\order\service\OrderFlowNodeService;
 use xjryanse\goods\service\GoodsPrizeKeyService;
 use think\Db;
@@ -30,7 +31,7 @@ class FinanceStatementOrderService {
      * @throws Exception
      */
     public function payCancel(){
-        $financeStatementOrder = $this->get(0);
+        $financeStatementOrder = $this->get();
         $statementId = Arrays::value($financeStatementOrder, 'statement_id');
         //调用取消订单接口
         //取消结算
@@ -67,8 +68,10 @@ class FinanceStatementOrderService {
         $con[] = ['order_id','=',$orderId];
         $con[] = ['has_statement','=',0];   //未出账单
         $con[] = ['has_settle','=',0];      //未结算
-        $lists = self::mainModel()->where( $con )->select();
-        foreach( $lists as $k=>$v){
+        //$lists = self::mainModel()->where( $con )->select();
+        $listsAll = OrderService::getInstance($orderId)->objAttrsList('financeStatementOrder');
+        $listFilter = Arrays2d::listFilter($listsAll, $con);
+        foreach( $listFilter as $k=>$v){
             self::getInstance( $v['id'])->delete();
         }
     }
@@ -86,8 +89,10 @@ class FinanceStatementOrderService {
      * 一般用于账单结账后触发订单
      */
     public static function statementIdTriggerOrderFlow($statementId){
-        $con[] = ['statement_id','=',$statementId];
-        $orderIds = self::mainModel()->where($con)->column('distinct order_id');
+//        $con[] = ['statement_id','=',$statementId];
+//        $orderIds = self::mainModel()->where($con)->column('distinct order_id');
+        $lists = FinanceStatementService::getInstance($statementId)->objAttrsList('financeStatementOrder');
+        $orderIds = array_unique(array_column($lists,'order_id'));
         Debug::debug('FinanceStatementOrderService触发关联订单动作',$orderIds);
         //触发动作
         foreach($orderIds as $orderId){
@@ -103,10 +108,28 @@ class FinanceStatementOrderService {
     public static function statementGoodsName( $statementId )
     {
         $con[]      = ['statement_id','=',$statementId];
-        $orderIds   = FinanceStatementOrderService::column('order_id',$con);
-        $con1[]     = ['id','in',$orderIds];
-        $goodsName  = OrderService::column('goods_name',$con1);
-        return implode(',', $goodsName);
+        return self::conGoodsName($con);
+    }
+    
+    /**
+     * 对账单商品id
+     */
+    public static function statementOrderGoodsName( $ids )
+    {
+        $con[]      = ['id','in',$ids];
+        return self::conGoodsName($con);
+    }
+    /**
+     * 条件取商品名
+     * @param type $con
+     * @return type
+     */
+    protected static function conGoodsName($con=[]){
+        $idSql = FinanceStatementOrderService::mainModel()->where($con)->field('distinct order_id')->buildSql();
+        $orderTable = OrderService::getTable();
+        $sql = '( SELECT `goods_name` FROM `'.$orderTable.'` WHERE  `id` in ' . $idSql . ') ';
+        $res = Db::query($sql);
+        return implode(',', array_column($res, 'goods_name'));
     }
     
     public static function extraPreSave(&$data, $uuid) {
@@ -280,24 +303,20 @@ class FinanceStatementOrderService {
         //self::orderMoneyUpdate($orderId);
         //是退款单的，把退款金额结算一下
         $refStatementOrderId = Arrays::value( $info , 'ref_statement_order_id');
-//        dump('$refStatementOrderId');
-//        dump( $refStatementOrderId );
-//        dump( self::mainModel()->where('ref_statement_order_id',$refStatementOrderId)->find() );
-//        dump('$refStatementOrderId-结束');
         
         if($refStatementOrderId && self::mainModel()->where('ref_statement_order_id',$refStatementOrderId)->find()){
             $con[] = ['ref_statement_order_id','=',$refStatementOrderId];
             $con[] = ['has_settle','=',1];
             $money = self::sum($con, 'need_pay_prize');
-//            dump('$refStatementOrderId-内部');
-//            dump( $refStatementOrderId );
+            self::mainModel()->where('id',$refStatementOrderId)->update(['ref_prize'=>$money]);
             //更新退款字段的金额
-            self::getInstance( $refStatementOrderId )->update(['ref_prize'=>$money]);   //订单的退款金额
+            //self::getInstance( $refStatementOrderId )->update(['ref_prize'=>$money]);   //订单的退款金额
         }
-        if(Arrays::value( $data , 'has_settle') == 1){
-            //重新校验未结账单的金额，20210407
-            self::reCheckNoSettle($orderId);
-        }
+        //20211004尝试去除
+//        if(Arrays::value( $data , 'has_settle') == 1){
+//            //重新校验未结账单的金额，20210407
+//            self::reCheckNoSettle($orderId);
+//        }
     }
     
     public static function extraDetail(&$item, $uuid) {
@@ -347,6 +366,10 @@ class FinanceStatementOrderService {
         if(!is_array($statementOrderIds)){
             $statementOrderIds = [$statementOrderIds];
         }
+        $con[] = ['id','in',$statementOrderIds];
+        $statementOrderInfos = self::listSetUudata($con,MASTER_DATA);
+        Debug::debug('getStatementIdWithGenerate调试打印',$statementOrderInfos);
+       
         $statementIds = [];
         // 多个账单循环取消
         foreach($statementOrderIds as $statementOrderId){
@@ -370,7 +393,8 @@ class FinanceStatementOrderService {
             throw new Exception('账单明细对应了多个账单，部分已结无法取消，请联系开发');
         }
 
-        $statementId = array_unique($statementIds)[0];
+        $uniqIds = array_unique($statementIds);
+        $statementId = $uniqIds ?  array_pop($uniqIds) : '';
         if(!$statementId){
             //重新生成账单
             $financeStatement = FinanceStatementService::statementGenerate( $statementOrderIds );

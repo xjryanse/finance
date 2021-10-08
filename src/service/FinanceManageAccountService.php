@@ -6,6 +6,8 @@ use xjryanse\user\service\UserService;
 use xjryanse\customer\service\CustomerService;
 use xjryanse\logic\Arrays;
 use xjryanse\logic\Debug;
+use xjryanse\logic\Sql;
+use think\Db;
 use Exception;
 
 /**
@@ -20,6 +22,21 @@ class FinanceManageAccountService {
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceManageAccount';
     //直接执行后续触发动作
     protected static $directAfter = true;    
+    
+    /**
+     * 更新余额
+     */
+    public function updateRemainMoney()
+    {
+        $mainTable  =   self::getTable();
+        $mainField  =   "money";
+        $dtlTable   =   FinanceManageAccountLogService::getTable();
+        $dtlStaticField     =   "money";
+        $dtlUniField        =   "manage_account_id";
+        $dtlCon[] = ['manage_account_id','=',$this->uuid];
+        $sql = Sql::staticUpdate($mainTable, $mainField, $dtlTable, $dtlStaticField, $dtlUniField,$dtlCon);
+        return Db::query($sql);
+    }
     
     public static function addManageAccountData( &$data )
     {

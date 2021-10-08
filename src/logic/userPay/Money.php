@@ -41,18 +41,18 @@ class Money extends Base implements UserPayInterface
         $data['statement_id']   = $statementId;
         $data['change_type']    = Arrays::value($info, 'change_type');
         $data['account_id']     = FinanceAccountService::getIdByAccountType($companyId, FR_FINANCE_MONEY );
-        //公司账户进账
-        $res = FinanceAccountLogService::save($data);
         //写入账户表的额外记录
         $data['change_reason']  = Arrays::value($info, 'statement_name');
         $data['from_table']     = FinanceStatementService::mainModel()->getTable();
         $data['from_table_id']  = $statementId;
         //扣减账户余额
-        $resp = AccountLogic::doOutcome( $data['user_id'] , FR_FINANCE_MONEY, $data['money'], $data ); 
-        //更新来源表，和来源表id
-        $updData['from_table']     = UserAccountLogService::mainModel()->getTable();
-        $updData['from_table_id']  = $resp['id'];
-        FinanceAccountLogService::getInstance($res['id'])->update( $updData );
+        $resp = UserAccountLogService::doOutcome( $data['user_id'] , FR_FINANCE_MONEY, $data['money'], $data ); 
+//        //更新来源表，和来源表id
+//        $data['from_table']     = UserAccountLogService::mainModel()->getTable();
+//        $data['from_table_id']  = $resp['id'];
+//        //注意先后顺序公司账户进账
+//        FinanceAccountLogService::save($data);
+        //FinanceAccountLogService::getInstance($res['id'])->update( $updData );
 
         return $resp;
     }

@@ -42,9 +42,10 @@ class FinanceManageAccountLogService {
     }
     
     public static function extraAfterSave(&$data, $uuid) {
-        $manageAccountId    = Arrays::value($data, 'manage_account_id');         
-        $customerMoney      = self::moneyCalc( $manageAccountId );
-        FinanceManageAccountService::mainModel()->where('id',$manageAccountId)->update(['money'=>$customerMoney]);        
+        $manageAccountId    = Arrays::value($data, 'manage_account_id');        
+//        $customerMoney      = self::moneyCalc( $manageAccountId );
+//        FinanceManageAccountService::mainModel()->where('id',$manageAccountId)->update(['money'=>$customerMoney]);        
+        FinanceManageAccountService::getInstance($manageAccountId)->updateRemainMoney();        
     }
     /**
      * 

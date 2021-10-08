@@ -102,7 +102,9 @@ class FinanceAccountLogService {
         
         if( $fromTable ){
             $service = DbOperate::getService( $fromTable );
-            $service::getInstance( $fromTableId )->update( ['into_account'=>1]);    //来源表入账状态更新为已入账
+            if( $service::mainModel()->hasField('into_account')){
+                $service::getInstance( $fromTableId )->update( ['into_account'=>1]);    //来源表入账状态更新为已入账
+            }
         }
         //更新账户余额
         FinanceAccountService::getInstance( $accountId )->updateRemainMoney();
@@ -127,15 +129,11 @@ class FinanceAccountLogService {
         //【对账单id】（如有关联对账单id，进行对冲结算）
         if($statementId){
             FinanceStatementService::getInstance($statementId)->update(['has_settle'=>1,"account_log_id"=>$uuid]);
-            //20210429添加，TODO校验影响
-            $con    = [];
-            $con[]  = ['statement_id','=',$statementId];
-            FinanceStatementOrderService::mainModel()->where($con)->update(['has_settle'=>1]);
-        }
-        
-        Debug::debug('$statementId',$statementId);
-        if( $statementId ){
-            $data['busier_id'] = FinanceStatementService::getInstance( $statementId )->fBusierId();
+//            //20210429添加，TODO校验影响
+//            $con    = [];
+//            $con[]  = ['statement_id','=',$statementId];
+//            FinanceStatementOrderService::mainModel()->where($con)->update(['has_settle'=>1]);
+            //$data['busier_id'] = FinanceStatementService::getInstance( $statementId )->fBusierId();
             //触发关联订单动作
             Debug::debug('FinanceAccountLogService触发关联订单动作',$statementId);
             FinanceStatementOrderService::statementIdTriggerOrderFlow($statementId);
@@ -174,14 +172,31 @@ class FinanceAccountLogService {
         return $res;
     }
     /**
+     * 快速的保存方法
+     */
+    public static function saveFast(){
+        //①保存本类明细
+        //②更新总表
+        //③保存FinanceManageAccountLogService明细；
+        //④保存FinanceManageAccountService总表
+        //结算账单总表：w_finance_statement
+        //结算账单明细：w_finance_statement_order
+        
+        //触发关联订单动作
+        
+        
+    }
+    /**
      * 对账单是否有收款记录
      * @param type $statementId
      * @return type
      */
     public static function statementHasLog( $statementId )
     {
-        $con[] = ['statement_id','=',$statementId];
-        return self::count($con) ? self::find( $con ) : false;
+        $logs = FinanceStatementService::getInstance($statementId)->objAttrsList('financeAccountLog');
+        return count($logs);
+//        $con[] = ['statement_id','=',$statementId];
+//        return self::count($con) ? self::find( $con ) : false;
     }
     
     /**
@@ -189,8 +204,11 @@ class FinanceAccountLogService {
      * 适用于组合支付中查询金额进行处理
      */
     public static function statementFinishMoney( $statementId ){
-        $con[] = ['statement_id','=',$statementId];
-        return self::sum($con,'money');
+        $logs = FinanceStatementService::getInstance($statementId)->objAttrsList('financeAccountLog');
+        return array_sum(array_column($logs, 'money'));
+        
+//        $con[] = ['statement_id','=',$statementId];
+//        return self::sum($con,'money');
     }
     /**
      * 来源表和来源id查是否有记录：
@@ -205,7 +223,7 @@ class FinanceAccountLogService {
         $con[] = ['from_table','=',$fromTable];
         $con[] = ['from_table_id','=',$fromTableId];
         
-        return self::count($con) ? self::find( $con ) : false;
+        return self::count($con) ? true : false;
     }
     /**
      * 计算客户端的账户余额

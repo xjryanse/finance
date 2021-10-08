@@ -4,6 +4,10 @@ namespace xjryanse\finance\service;
 
 use think\Db;
 use Exception;
+use xjryanse\logic\DbOperate;
+use xjryanse\logic\Sql;
+use xjryanse\logic\Arrays2d;
+use xjryanse\system\service\SystemCompanyService;
 /**
  * 账户表
  */
@@ -34,10 +38,9 @@ class FinanceAccountService {
      */
     public static function getIdByAccountType( $companyId, $accountType )
     {
-        $con[] = ['company_id','=',$companyId];
         $con[] = ['account_type','=',$accountType];
-
-        $info = self::find( $con );
+        $listsAll   = SystemCompanyService::getInstance($companyId)->objAttrsList('financeAccount');
+        $info       = Arrays2d::listFind($listsAll, $con);
         if(!$info){
             $info = self::createAccount($accountType);
         }
@@ -76,9 +79,17 @@ class FinanceAccountService {
      */
     public function updateRemainMoney()
     {
-        $con[] = ['account_id','=',$this->uuid];
-        $money = FinanceAccountLogService::mainModel()->where($con)->sum('money');
-        return self::mainModel()->where('id',$this->uuid)->update(['money'=>$money]);
+//        $con[] = ['account_id','=',$this->uuid];
+//        $money = FinanceAccountLogService::mainModel()->where($con)->sum('money');
+//        return self::mainModel()->where('id',$this->uuid)->update(['money'=>$money]);
+        $mainTable  =   self::getTable();
+        $mainField  =   "money";
+        $dtlTable   =   FinanceAccountLogService::getTable();
+        $dtlStaticField     =   "money";
+        $dtlUniField        =   "account_id";
+        $dtlCon[] = ['account_id','=',$this->uuid];
+        $sql = Sql::staticUpdate($mainTable, $mainField, $dtlTable, $dtlStaticField, $dtlUniField,$dtlCon);
+        return Db::query($sql);
     }
     /**
      *
