@@ -27,26 +27,39 @@ class FinanceAccountLogService {
      */
     public static function extraPreSave(&$data, $uuid) {
         self::checkTransaction();
+        $statementId    = Arrays::value($data, 'statement_id'); //对账单id
+        if($statementId){
+            if(self::statementHasLog($statementId)){
+                throw new Exception("该对账单已收款过了，请直接冲账");
+            }
+            $statementInfo = FinanceStatementService::getInstance($statementId)->get();
+            $data['dept_id']        = Arrays::value($statementInfo, 'dept_id');  //不一定有
+            $data['customer_id']    = Arrays::value($statementInfo, 'customer_id');  //不一定有
+            $data['user_id']        = Arrays::value($statementInfo, 'user_id');      //不一定有            
+            $data['busier_id']      = Arrays::value($statementInfo, 'busier_id');      //不一定有      
+            $data['change_type']    = Arrays::value($statementInfo, 'change_type');      //不一定有     
+            $needPayPrize           = Arrays::value($statementInfo, 'need_pay_prize');
+            if(!Arrays::value($data, 'money')){
+                $data['money']          = $needPayPrize;
+            } else if($data['money'] != $needPayPrize){
+                throw new Exception('入参金额'.$data['money'].'和账单金额'.$needPayPrize.'不符,账单号'.$statementId);
+            }
+        }
+        if(!Arrays::value($data, 'customer_id') && !Arrays::value($data, 'user_id')){
+            throw new Exception('付款客户或付款用户必须(customer_id/user_id)');
+        }
+
         Debug::debug('保存信息',$data);
         $notice['account_id']   = "请选择账户";
         $notice['money']        = "金额必须";
-        DataCheck::must($data, ['money','account_id'],$notice);
-        $customerId     = Arrays::value($data, 'customer_id');  //不一定有
-        $userId         = Arrays::value($data, 'user_id');      //不一定有
-        $accountId      = Arrays::value($data, 'account_id');
+        DataCheck::must($data, ['money','account_id','change_type'], $notice);
+        //20220608;增加判断
+        if(!Arrays::value($data, 'user_id') && !Arrays::value($data, 'customer_id')){
+            throw new Exception('customer_id和user_id需至少有一个参数有值');
+        }
+
         $fromTable      = Arrays::value($data, 'from_table');
         $fromTableId    = Arrays::value($data, 'from_table_id');
-        $statementId    = Arrays::value($data, 'statement_id'); //对账单id
-        $statementCustomerId = FinanceStatementService::getInstance( $statementId )->fCustomerId();
-        if( $statementId && $customerId !=$statementCustomerId){
-            throw new Exception("收付款客户". $customerId ."与关联账单".$statementId."的客户". $statementCustomerId ."不符");
-        }
-        if($statementId && (!$customerId && !$userId)){
-            throw new Exception("缺少客户".$customerId."和用户".$userId. json_encode($data));
-        }    
-        if($statementId && self::statementHasLog($statementId)){
-            throw new Exception("该对账单已收款过了，请直接冲账");
-        }
         if($fromTable){
             $service = DbOperate::getService( $fromTable );
             $info = $service::getInstance( $fromTableId )->get(0);
@@ -56,32 +69,11 @@ class FinanceAccountLogService {
                 }
             }
             //customer_id
-            $data['customer_id']    = Arrays::value($data, 'customer_id') ? :Arrays::value($info, 'customer_id');
-            $data['user_id']        = Arrays::value($data, 'user_id') ? :Arrays::value($info, 'user_id');
-        }
-        if(!Arrays::value($data, 'customer_id') && !Arrays::value($data, 'user_id')){
-            throw new Exception('付款客户或付款用户必须(customer_id/user_id)');
-        }
-        if(!Arrays::value($data, 'change_type')){
-            throw new Exception('未指定出账还是入账');
+            // 20220608尝试去除数据
+            //$data['customer_id']    = Arrays::value($data, 'customer_id') ? :Arrays::value($info, 'customer_id');
+            //$data['user_id']        = Arrays::value($data, 'user_id') ? :Arrays::value($info, 'user_id');
         }
 
-        //出账，负值
-        if( Arrays::value($data, 'change_type') == '2' ){
-            $data['money']  = -1 * abs($data['money']);
-            //小于客户余额，不可出账
-            if( $customerId ){
-                $customerMoney = self::customerMoneyCalc($customerId, $accountId);
-                if( abs($data['money']) > $customerMoney ){
-//                    throw new Exception('该客户最多可退￥'.$customerMoney);
-                }
-            }
-        }
-        Debug::debug('$statementId',$statementId);
-        if( $statementId ){
-            $data['busier_id'] = FinanceStatementService::getInstance( $statementId )->fBusierId();
-        }
-        
         return $data;
     }
     
@@ -108,7 +100,7 @@ class FinanceAccountLogService {
         }
         //更新账户余额
         FinanceAccountService::getInstance( $accountId )->updateRemainMoney();
-        //更新客户挂账
+        //更新客户挂账 ???可否取消？？20220617
         if(FinanceAccountService::getInstance($accountId)->fAccountType() == 'customer'){
             $customerMoney = self::customerMoneyCalc($customerId, $accountId);
             CustomerService::mainModel()->where('id',$customerId)->update(['pre_pay_money'=>$customerMoney]);
@@ -172,6 +164,184 @@ class FinanceAccountLogService {
         return $res;
     }
     /**
+     * 20220620 
+     * @param type $data
+     * @param type $uuid
+     * @return type
+     * @throws Exception
+     */
+    public static function ramPreSave(&$data, $uuid) {
+        $statementId    = Arrays::value($data, 'statement_id'); //对账单id
+        if($statementId){
+            if(self::statementHasLog($statementId)){
+                throw new Exception("该对账单已收款过了，请直接冲账");
+            }
+            $statementInfo = FinanceStatementService::getInstance($statementId)->get();
+            $data['dept_id']        = Arrays::value($statementInfo, 'dept_id');  //不一定有
+            $data['customer_id']    = Arrays::value($statementInfo, 'customer_id');  //不一定有
+            $data['user_id']        = Arrays::value($statementInfo, 'user_id');      //不一定有            
+            $data['busier_id']      = Arrays::value($statementInfo, 'busier_id');      //不一定有      
+            $data['change_type']    = Arrays::value($statementInfo, 'change_type');      //不一定有     
+            $needPayPrize           = Arrays::value($statementInfo, 'need_pay_prize');
+            if(!Arrays::value($data, 'money')){
+                $data['money']          = $needPayPrize;
+            } else if($data['money'] != $needPayPrize){
+                throw new Exception('入参金额'.$data['money'].'和账单金额'.$needPayPrize.'不符,账单号'.$statementId);
+            }
+        }
+        if(!Arrays::value($data, 'customer_id') && !Arrays::value($data, 'user_id')){
+            throw new Exception('付款客户或付款用户必须(customer_id/user_id)');
+        }
+
+        Debug::debug('保存信息',$data);
+        $notice['account_id']   = "请选择账户";
+        $notice['money']        = "金额必须";
+        DataCheck::must($data, ['money','account_id','change_type'], $notice);
+        //20220608;增加判断
+        if(!Arrays::value($data, 'user_id') && !Arrays::value($data, 'customer_id')){
+            throw new Exception('customer_id和user_id需至少有一个参数有值');
+        }
+
+        $fromTable      = Arrays::value($data, 'from_table');
+        $fromTableId    = Arrays::value($data, 'from_table_id');
+        if($fromTable){
+            $service = DbOperate::getService( $fromTable );
+            $info = $service::getInstance( $fromTableId )->get(0);
+            if( $service::mainModel()->hasField('into_account')){
+                if( $info['into_account'] != 0){
+                    throw new Exception('非待入账数据不可入账:'.$fromTable.'-'.$fromTableId);
+                }
+            }
+        }
+
+        $data['pre_log_id'] = Arrays::value($data, 'pre_log_id') ? : self::preUniSave($data);
+
+        return $data;
+    }
+    
+    /**
+     * 额外输入信息
+     */
+    public static function ramAfterSave(&$data, $uuid) {
+        $customerId     = Arrays::value($data, 'customer_id');  //不一定有
+        $accountId      = Arrays::value($data, 'account_id');        
+        $userId         = Arrays::value($data, 'user_id');      //支付用户（个人）        
+        $fromTable      = Arrays::value($data, 'from_table');
+        $fromTableId    = Arrays::value($data, 'from_table_id');
+        $statementId    = Arrays::value($data, 'statement_id'); //对账单id
+
+        if( $statementId && FinanceStatementService::getInstance($statementId)->fHasSettle() ){
+            throw new Exception('账单'.$statementId.'已结算');            
+        }
+        
+        if( $fromTable ){
+            $service = DbOperate::getService( $fromTable );
+            if( $service::mainModel()->hasField('into_account')){
+                $service::getInstance( $fromTableId )->updateRam( ['into_account'=>1]);    //来源表入账状态更新为已入账
+            }
+        }
+        FinanceAccountService::getInstance( $accountId )->updateRemainMoneyRam();
+        
+        //更新账户余额: 20220620TODObug??
+        /*
+        FinanceAccountService::getInstance( $accountId )->updateRemainMoney();
+        //更新客户挂账 ???可否取消？？20220617
+        if(FinanceAccountService::getInstance($accountId)->fAccountType() == 'customer'){
+            $customerMoney = self::customerMoneyCalc($customerId, $accountId);
+            CustomerService::mainModel()->where('id',$customerId)->update(['pre_pay_money'=>$customerMoney]);
+        }
+         */
+        
+        //最新：更新客户的挂账款流水金额
+        if($customerId){
+            $manageAccountId = FinanceManageAccountService::customerManageAccountId($customerId);
+        } else {
+            $manageAccountId = FinanceManageAccountService::userManageAccountId($userId);
+        }
+        $data2 = Arrays::getByKeys($data, ['money','user_id','account_id','change_type','reason']);
+        $data2['manage_account_id'] = $manageAccountId;
+        $data2['from_table']    = self::mainModel()->getTable();
+        $data2['from_table_id'] = $uuid;
+        FinanceManageAccountLogService::saveRam($data2);
+        
+        //【对账单id】（如有关联对账单id，进行对冲结算）
+        if($statementId){
+            FinanceStatementService::getInstance($statementId)->updateRam(['has_settle'=>1,"account_log_id"=>$uuid]);
+        }
+        
+        self::afterUniSave($data);   
+    }
+    /**
+     * 删除
+     */
+    public function ramPreDelete() {
+        $info = $this->get();
+        FinanceAccountService::getInstance( $info['account_id'] )->updateRemainMoneyRam();
+    }
+    /**
+     * 如果statementId,有前序账单，
+     * 
+     * 
+     * @param type $data
+     */
+    public static function preUniSave($data){
+        DataCheck::must($data, ['account_id']);
+        // 对账单id
+        $statementId    = Arrays::value($data, 'statement_id'); 
+        if(!$statementId){
+            return '';
+        }
+        //无指向，或指向为后向，才进行处理
+        $dealDirection = Arrays::value($data, DIRECTION);        
+        if($dealDirection && $dealDirection != DIRECT_PRE){
+            return '';
+        }
+        $preStatementInfo = FinanceStatementService::getInstance($statementId)->getPreData('pre_statement_id');  
+        if(!$preStatementInfo){
+            return '';
+        }
+        
+        $accountData['account_id']      =  Arrays::value($data, 'account_id');
+        $accountData['statement_id']    =  $preStatementInfo['id'];
+        $accountData['bill_time']       =  Arrays::value($data, 'bill_time',date('Y-m-d H:i:s'));
+        $accountData[DIRECTION]          = DIRECT_PRE;
+        $resData = self::saveRam($accountData);
+        return $resData ? $resData['id'] : '';
+    }
+    /**
+     * 20220622
+     * @param type $data
+     * @return boolean|string
+     */
+    public static function afterUniSave($data){
+
+        DataCheck::must($data, ['account_id']);
+        // 对账单id
+        $statementId    = Arrays::value($data, 'statement_id'); 
+        if(!$statementId){
+            return '';
+        }
+        //无指向，或指向为后向，才进行处理
+        $dealDirection = Arrays::value($data, DIRECTION);        
+        if($dealDirection && $dealDirection != DIRECT_AFT){
+            return '';
+        }
+        
+        $afterStatementInfos = FinanceStatementService::getInstance($statementId)->getAfterDataArr('pre_statement_id');  
+        foreach($afterStatementInfos as $afterStatementInfo){
+            //20220622未结算才处理
+            $accountData['account_id']      = Arrays::value($data, 'account_id');
+            $accountData['statement_id']    = $afterStatementInfo['id'];
+            $accountData['pre_log_id']      = $data['id'];
+            $accountData['bill_time']       = Arrays::value($data, 'bill_time',date('Y-m-d H:i:s'));
+            $accountData[DIRECTION]         = DIRECT_AFT;
+            self::saveRam($accountData);
+        }
+
+        return true;
+    }
+    
+    /**
      * 快速的保存方法
      */
     public static function saveFast(){
@@ -197,6 +367,36 @@ class FinanceAccountLogService {
         return count($logs);
 //        $con[] = ['statement_id','=',$statementId];
 //        return self::count($con) ? self::find( $con ) : false;
+    }
+    /**
+     * 20220527
+     * 账单id取账户类型
+     */
+    public static function statementIdsGetAccountType($statementId){
+        //20220618:空账单不用查
+        if(!$statementId || (is_array($statementId) && count($statementId) == 1 && !$statementId[0])){
+            return '';
+        }
+        $statementIds = is_array($statementId) ? $statementId : [$statementId];
+        $accountLogIds = [];
+        foreach($statementIds as $stId){
+            $statementInfo      = FinanceStatementService::getInstance($stId)->get();
+            $accountLogIds[]    = $statementInfo['account_log_id'];
+        }
+        $accountIds = [];
+        foreach($accountLogIds as $logId){
+            $logInfo      = self::getInstance($logId)->get();
+            $accountIds[]    = $logInfo['account_id'];
+        }
+        
+//
+//        //statementId,取accountLog表的accountId
+//        $con1[] = ['statement_id','in',$statementId];
+//        $accountIds = self::mainModel()->where($con1)->column('distinct account_id');
+        //accountId,取类型
+        $con2[] = ['id','in',$accountIds];
+        $accountTypes = FinanceAccountService::mainModel()->where($con2)->column('distinct account_type');
+        return $accountTypes ? (count($accountTypes) > 1 ? 'mix': $accountTypes[0] ) :'';
     }
     
     /**

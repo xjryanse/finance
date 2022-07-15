@@ -13,6 +13,7 @@ use Exception;
 
 /**
  * 账户付款单表
+ * 废弃：20220617
  */
 class FinanceOutcomeLogic
 {

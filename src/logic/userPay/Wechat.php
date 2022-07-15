@@ -14,6 +14,7 @@ use xjryanse\logic\Arrays;
 use xjryanse\logic\DataCheck;
 use xjryanse\wechat\WxPay\WxPayLogic;
 use Exception;
+use think\Db;
 
 /**
  * 微信支付
@@ -45,7 +46,9 @@ class Wechat extends Base implements UserPayInterface
         $data['order_id']   = Arrays::value($incomeInfo, 'order_id');
         $data['pay_by']     = FR_FINANCE_MONEY;
         //生成支付单
+        Db::startTrans();
         $pay = FinanceIncomePayLogic::newPay($incomeInfo['id'], $money, $incomeInfo['user_id'], $data);
+        Db::commit();
         //支付单
         $WxPayLogic         = new WxPayLogic($thirdPayParam['wePubAppId'], $thirdPayParam['openid'] );
         $attach             = ['statement_id'=>$incomeInfo['id']];  //收款单信息扔到附加数据

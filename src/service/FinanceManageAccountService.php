@@ -33,7 +33,7 @@ class FinanceManageAccountService {
         $dtlTable   =   FinanceManageAccountLogService::getTable();
         $dtlStaticField     =   "money";
         $dtlUniField        =   "manage_account_id";
-        $dtlCon[] = ['manage_account_id','=',$this->uuid];
+        $dtlCon[] = ['main.id','=',$this->uuid];
         $sql = Sql::staticUpdate($mainTable, $mainField, $dtlTable, $dtlStaticField, $dtlUniField,$dtlCon);
         return Db::query($sql);
     }

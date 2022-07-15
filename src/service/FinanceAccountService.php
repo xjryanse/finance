@@ -7,6 +7,7 @@ use Exception;
 use xjryanse\logic\DbOperate;
 use xjryanse\logic\Sql;
 use xjryanse\logic\Arrays2d;
+use xjryanse\logic\Debug;
 use xjryanse\system\service\SystemCompanyService;
 /**
  * 账户表
@@ -87,10 +88,31 @@ class FinanceAccountService {
         $dtlTable   =   FinanceAccountLogService::getTable();
         $dtlStaticField     =   "money";
         $dtlUniField        =   "account_id";
-        $dtlCon[] = ['account_id','=',$this->uuid];
+        $dtlCon[] = ['main.id','=',$this->uuid];
         $sql = Sql::staticUpdate($mainTable, $mainField, $dtlTable, $dtlStaticField, $dtlUniField,$dtlCon);
+        Debug::debug('updateRemainMoney的$sql',$sql);
         return Db::query($sql);
     }
+    /**
+     * 20220622
+     * @global array $glSqlQuery
+     * @return boolean
+     */
+    public function updateRemainMoneyRam()
+    {
+        global $glSqlQuery;
+        $mainTable  =   self::getTable();
+        $mainField  =   "money";
+        $dtlTable   =   FinanceAccountLogService::getTable();
+        $dtlStaticField     =   "money";
+        $dtlUniField        =   "account_id";
+        $dtlCon[] = ['main.id','=',$this->uuid];
+        $sql = Sql::staticUpdate($mainTable, $mainField, $dtlTable, $dtlStaticField, $dtlUniField,$dtlCon);
+        //扔一条sql到全局变量，方法执行结束后执行
+        $glSqlQuery[] = $sql;
+        return true;
+    }
+
     /**
      *
      */

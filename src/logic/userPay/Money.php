@@ -11,6 +11,7 @@ use xjryanse\finance\service\FinanceAccountService;
 use xjryanse\finance\service\FinanceStatementService;
 use xjryanse\finance\service\FinanceAccountLogService;
 use xjryanse\logic\Arrays;
+use xjryanse\logic\Debug;
 use Exception;
 use think\Db;
 /**
@@ -66,6 +67,8 @@ class Money extends Base implements UserPayInterface
         $fromTable  = FinanceIncomePayService::mainModel()->getTable();
         $payLog     = UserAccountLogService::hasLog( $fromTable, $incomePayId );
         $info       = FinanceIncomePayService::getInstance( $incomePayId )->get();
+        Debug::debug('afterPay的$info',$info);
+        Debug::debug('afterPay的$payLog',$payLog);
         //支出为负值，故取绝对值
         if( $payLog && abs($payLog['change']) >= abs($info['money'])){
             //支付单更新为已收款
