@@ -117,4 +117,14 @@ class Money extends Base implements UserPayInterface
         Db::commit();
         return $res;
     }
+    
+    /**
+     * 20230904:单笔关单
+     * @param type $statementId
+     */
+    public static function cancel($statementId){
+        // 关单
+        
+        return true;
+    }
 }

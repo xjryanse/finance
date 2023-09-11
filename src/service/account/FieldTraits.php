@@ -1,19 +1,11 @@
 <?php
 
-namespace xjryanse\finance\service;
+namespace xjryanse\finance\service\account;
 
 /**
- * 付款记录表：用户支付
+ * 分页复用列表
  */
-class FinanceOutcomePayService {
-
-    use \xjryanse\traits\InstTrait;
-    use \xjryanse\traits\MainModelTrait;
-    use \xjryanse\traits\MainModelQueryTrait;
-
-    protected static $mainModel;
-    protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceOutcomePay';
-
+trait FieldTraits{
     /**
      *
      */
@@ -36,51 +28,30 @@ class FinanceOutcomePayService {
     }
 
     /**
-     * 支付单号
+     * 账户名称
      */
-    public function fOutcomePaySn() {
+    public function fAccountName() {
         return $this->getFFieldValue(__FUNCTION__);
     }
 
     /**
-     * 付款单id，finance_outcome表
+     * 账户类型(cash：现金,wechat：微信，corporate：对公账，meituan：美团账户)
      */
-    public function fOutcomeId() {
+    public function fAccountType() {
         return $this->getFFieldValue(__FUNCTION__);
     }
 
     /**
-     * 付款单-金额
+     * 账号
+     */
+    public function fAccountNo() {
+        return $this->getFFieldValue(__FUNCTION__);
+    }
+
+    /**
+     * 账户余额
      */
     public function fMoney() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
-
-    /**
-     * 付款单-号
-     */
-    public function fOutcomeSn() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
-
-    /**
-     * 付款状态：1待收款、2已收款、3已超时
-     */
-    public function fOutcomeStatus() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
-
-    /**
-     * 支付描述
-     */
-    public function fDescribe() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
-
-    /**
-     * 支付用户id
-     */
-    public function fUserId() {
         return $this->getFFieldValue(__FUNCTION__);
     }
 
@@ -153,5 +124,6 @@ class FinanceOutcomePayService {
     public function fUpdateTime() {
         return $this->getFFieldValue(__FUNCTION__);
     }
+
 
 }

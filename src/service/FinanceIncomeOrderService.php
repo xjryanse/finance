@@ -8,22 +8,23 @@ use xjryanse\logic\Arrays;
 /**
  * 收款单-订单关联
  */
-class FinanceIncomeOrderService implements ExtraDataInterface{
+class FinanceIncomeOrderService implements ExtraDataInterface {
 
     use \xjryanse\traits\InstTrait;
     use \xjryanse\traits\MainModelTrait;
+    use \xjryanse\traits\MainModelQueryTrait;
 
     protected static $mainModel;
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceIncomeOrder';
-    
+
     /**
      * 额外输入信息
      */
     public static function extraPreSave(&$data, $uuid) {
         $info = self::getInstance($uuid)->get(0);
         //TODO
-        if(isset($data['file_id'])){
-            FinanceIncomeService::getInstance( Arrays::value($info,'income_id')  )->update(['file_id'=>$data['file_id']]);
+        if (isset($data['file_id'])) {
+            FinanceIncomeService::getInstance(Arrays::value($info, 'income_id'))->update(['file_id' => $data['file_id']]);
         }
         return $data;
     }
@@ -32,11 +33,13 @@ class FinanceIncomeOrderService implements ExtraDataInterface{
      * 额外详情信息
      */
     public static function extraDetail(&$item, $uuid) {
-        if(!$item){ return false;}
+        if (!$item) {
+            return false;
+        }
 
         return $item;
     }
-        
+
     /*
      * 获取订单费用
      * @param type $orderId     订单id

@@ -14,52 +14,56 @@ class FinanceIncomePayService {
 
     use \xjryanse\traits\InstTrait;
     use \xjryanse\traits\MainModelTrait;
+    use \xjryanse\traits\MainModelQueryTrait;
 
     protected static $mainModel;
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceIncomePay';
     //直接执行后续触发动作
     protected static $directAfter = true;
-    
+
     public static function extraPreSave(&$data, $uuid) {
-        if(Arrays::value($data, 'income_id')){
-            $data['order_id']       = FinanceStatementService::getInstance($data['income_id'])->fOrderId();
-            $data['customer_id']    = FinanceStatementService::getInstance($data['income_id'])->fCustomerId();
+        if (Arrays::value($data, 'income_id')) {
+            $data['order_id'] = FinanceStatementService::getInstance($data['income_id'])->fOrderId();
+            $data['customer_id'] = FinanceStatementService::getInstance($data['income_id'])->fCustomerId();
         }
         return $data;
     }
-    
+
     /**
      * 额外输入信息
      */
     public static function extraAfterSave(&$data, $uuid) {
         $orderId = Arrays::value($data, 'order_id');
         //尝试流程节点的更新
-        if( $orderId ){
-            OrderFlowNodeService::lastNodeFinishAndNext( $orderId );
+        if ($orderId) {
+            OrderFlowNodeService::lastNodeFinishAndNext($orderId);
         }
     }
+
     /**
      * 额外输入信息
      */
     public static function extraAfterUpdate(&$data, $uuid) {
         return self::extraAfterSave($data, $uuid);
-    }    
-    
+    }
+
     /**
      * 根据收款单id获取支付来源
      */
-    public static function columnPayByByIncomeId( $incomeId )
-    {
-        $con[] = ['income_id','=',$incomeId];
-        $con[] = ['income_status','=',XJRYANSE_OP_FINISH];
+    public static function columnPayByByIncomeId($incomeId) {
+        $con[] = ['income_id', '=', $incomeId];
+        $con[] = ['income_status', '=', XJRYANSE_OP_FINISH];
         return self::column('distinct pay_by', $con);
     }
+
     /*
      * 支付单转收款id
      */
+
     public static function paySnToId($sn) {
         return self::where('income_pay_sn', $sn)->value('income_id');
     }
+
     /**
      * 支付单转收款单id
      * @param type $sn
@@ -68,7 +72,7 @@ class FinanceIncomePayService {
     public static function paySnToIncomeId($sn) {
         return self::where('income_pay_sn', $sn)->value('income_id');
     }
-    
+
     /**
      * 获取订单的支付单号
      */
@@ -88,65 +92,62 @@ class FinanceIncomePayService {
         $res = self::save($data);
         return $res;
     }
-    
+
     /**
      * 取消支付
      */
-    public function cancelPay( )
-    {
+    public function cancelPay() {
         //支付单关闭
         $financeIncomePay = $this->get(0);
-        if( !$financeIncomePay ){
-            throw new Exception( '支付单'. $this->uuid.'不存在' );
+        if (!$financeIncomePay) {
+            throw new Exception('支付单' . $this->uuid . '不存在');
         }
-        if( $financeIncomePay['income_status'] != XJRYANSE_OP_TODO ){
-            throw new Exception( '支付单'. $this->uuid .'非待收款状态不能操作' );
+        if ($financeIncomePay['income_status'] != XJRYANSE_OP_TODO) {
+            throw new Exception('支付单' . $this->uuid . '非待收款状态不能操作');
         }
         //支付单更新为已关闭状态
-        $res = $this->setFieldWithPreValCheck('income_status',XJRYANSE_OP_TODO,XJRYANSE_OP_CLOSE );
+        $res = $this->setFieldWithPreValCheck('income_status', XJRYANSE_OP_TODO, XJRYANSE_OP_CLOSE);
         return $res;
     }
-    
+
     /**
      * 支付后确认收款【更新状态】
      * @param type $financeIncomePayId  支付单id
      */
-    public function afterPayDoIncome( )
-    {
+    public function afterPayDoIncome() {
         //校验事务
         self::checkTransaction();
         //支付单关闭
         $financeIncomePay = $this->get(0);
-        if( !$financeIncomePay ){
-            throw new Exception( '支付单'.$this->uuid.'不存在' );
+        if (!$financeIncomePay) {
+            throw new Exception('支付单' . $this->uuid . '不存在');
         }
-        if( $financeIncomePay['income_status'] != XJRYANSE_OP_TODO ){
-            throw new Exception( '支付单'.$this->uuid.'非待收款状态不能操作' );
+        if ($financeIncomePay['income_status'] != XJRYANSE_OP_TODO) {
+            throw new Exception('支付单' . $this->uuid . '非待收款状态不能操作');
         }
         //支付单更新为已完成
-        $res = $this->setFieldWithPreValCheck('income_status',XJRYANSE_OP_TODO,XJRYANSE_OP_FINISH );
+        $res = $this->setFieldWithPreValCheck('income_status', XJRYANSE_OP_TODO, XJRYANSE_OP_FINISH);
         return $res;
     }
-    
+
     /**
      * 支付单，单笔入账
      */
-    public function intoAccount()
-    {
+    public function intoAccount() {
         //校验事务
         self::checkTransaction();
         //获取支付单信息
-        $incomePay                  = $this->get();        
+        $incomePay = $this->get();
         //拼接入账数据
-        $logData                    = [];
-        $logData['reason']          = $incomePay['describe'];
-        $logData['from_table']      = self::mainModel()->getTable();
-        $logData['from_table_id']   = $incomePay['id'];
-        $logData['user_id']         = $incomePay['user_id'];            
+        $logData = [];
+        $logData['reason'] = $incomePay['describe'];
+        $logData['from_table'] = self::mainModel()->getTable();
+        $logData['from_table_id'] = $incomePay['id'];
+        $logData['user_id'] = $incomePay['user_id'];
         //收款单入账
-        $res = FinanceAccountLogic::doIncome($incomePay['company_id'], $incomePay['pay_by'], $incomePay['money'] ,$logData);
+        $res = FinanceAccountLogic::doIncome($incomePay['company_id'], $incomePay['pay_by'], $incomePay['money'], $logData);
         //设定入账状态为已入账
-        $this->setField( 'into_account',1 );
+        $this->setField('into_account', 1);
         return $res;
     }
 

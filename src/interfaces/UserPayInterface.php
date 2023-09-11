@@ -20,4 +20,10 @@ interface UserPayInterface
      * @param type $incomePayId 支付单id
      */
     public static function afterPay( $incomePayId );
+    /**
+     * 退款
+     * @param type $statementId
+     * @param type $thirdPayParam
+     */
+    public static function ref( $statementId ,$thirdPayParam=[]);
 }

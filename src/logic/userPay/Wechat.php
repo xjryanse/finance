@@ -11,6 +11,7 @@ use xjryanse\wechat\service\WechatWePubService;
 use xjryanse\wechat\service\WechatWxPayLogService;
 use xjryanse\wechat\service\WechatWePubFansUserService;
 use xjryanse\logic\Arrays;
+use xjryanse\logic\Debug;
 use xjryanse\logic\DataCheck;
 use xjryanse\wechat\WxPay\WxPayLogic;
 use Exception;
@@ -55,18 +56,21 @@ class Wechat extends Base implements UserPayInterface
         // 20210519 改income_pay_sn 为income_id
         $wxPayJsApiOrder    = $WxPayLogic->getWxPayJsApiOrder($pay['income_id'], $money, $incomeInfo['statement_name'],json_encode($attach));    
         $wxPayJsApiOrder['pay_id'] = Arrays::value($pay, 'id');
+        // 20230530:未支付成功时，前端有取消订单的动作。
+        $wxPayJsApiOrder['order_id'] = Arrays::value($data, 'order_id');
         return $wxPayJsApiOrder;
     }
     
     /**
-     * 付款完成后续处理
+     * 付款完成后续处理（好像没用）
      * @param type $incomePayId 支付单id
      */
     public static function afterPay( $incomePayId )
     {
-        $paySn      = FinanceIncomePayService::getInstance( $incomePayId )->fIncomePaySn();
+        // $paySn      = FinanceIncomePayService::getInstance( $incomePayId )->fIncomePaySn();
         $info       = FinanceIncomePayService::getInstance( $incomePayId )->get();
-        $wxPaySuccLog = WechatWxPayLogService::getByOutTradeNo($paySn);
+        $wxPaySuccLog = WechatWxPayLogService::getByOutTradeNo($info['income_id']);
+        Debug::debug('$wxPaySuccLog',$wxPaySuccLog);
         if( $wxPaySuccLog && $wxPaySuccLog['total_fee'] * 0.01 >= $info['money'] ){
             //支付单更新为已收款
             FinanceIncomePayLogic::afterPayDoIncome( $incomePayId );
@@ -97,7 +101,9 @@ class Wechat extends Base implements UserPayInterface
 
 //        $param["out_trade_no"]  = 'PAY5206678365661663232';     //原支付订单号
         $WxPayLogic         = new WxPayLogic($thirdPayParam['wePubAppId'], $thirdPayParam['openid'] );
-
+        if(Debug::isDebug()){
+            // throw new Exception('退款调试中');
+        }
         $res = $WxPayLogic->doRefund( $param );
         return $res;
     }
@@ -149,4 +155,15 @@ class Wechat extends Base implements UserPayInterface
         $res = $WxPayLogic->secProfitSharing( $input, $receivers );
         return $res;
     }
+    
+    /**
+     * 20230904:单笔关单
+     * @param type $statementId
+     */
+    public static function cancel($statementId){
+        // 关单
+        
+        return true;
+    }
+
 }

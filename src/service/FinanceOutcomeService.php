@@ -3,6 +3,7 @@
 namespace xjryanse\finance\service;
 
 use Exception;
+
 /**
  * 付款单
  */
@@ -10,54 +11,53 @@ class FinanceOutcomeService {
 
     use \xjryanse\traits\InstTrait;
     use \xjryanse\traits\MainModelTrait;
+    use \xjryanse\traits\MainModelQueryTrait;
 
     protected static $mainModel;
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceOutcome';
 
-    public function delete()
-    {
+    public function delete() {
         //多表删除需事务
         self::checkTransaction();
         //执行主表删除
         $res = $this->commDelete();
         //删除收款关联订单
-        $con[] = ['outcome_id','=',$this->uuid];
-        $lists = FinanceOutcomeOrderService::lists( $con );
-        foreach( $lists as $key=>$value){
-            if( $value['outcome_status'] == XJRYANSE_OP_FINISH){
-                throw new Exception('付款单对应订单已完成付款，付款单不可删除。记录id：'.$value['id']);
+        $con[] = ['outcome_id', '=', $this->uuid];
+        $lists = FinanceOutcomeOrderService::lists($con);
+        foreach ($lists as $key => $value) {
+            if ($value['outcome_status'] == XJRYANSE_OP_FINISH) {
+                throw new Exception('付款单对应订单已完成付款，付款单不可删除。记录id：' . $value['id']);
             }
             //删除
-            FinanceOutcomeOrderService::getInstance( $value['id'] )->delete();
+            FinanceOutcomeOrderService::getInstance($value['id'])->delete();
         }
-        
+
         //删除支付单
-        $outcomePays = FinanceOutcomePayService::lists( $con );
-        foreach( $outcomePays as $v){
-            FinanceOutcomePayService::getInstance( $v['id'] )->delete();
+        $outcomePays = FinanceOutcomePayService::lists($con);
+        foreach ($outcomePays as $v) {
+            FinanceOutcomePayService::getInstance($v['id'])->delete();
         }
 
         return $res;
     }
-    
+
     /**
      * 
      * @param type $data
      */
-    public static function save( $data )
-    {
+    public static function save($data) {
         $res = self::commSave($data);
-        if(isset($data['order_id'])){
+        if (isset($data['order_id'])) {
             $data['outcome_id'] = $res['id'];
             FinanceOutcomeOrderService::saveGetId($data);
             //收款单
-            if(isset($data['outcome_status']) && $data['outcome_status'] == XJRYANSE_OP_FINISH){
+            if (isset($data['outcome_status']) && $data['outcome_status'] == XJRYANSE_OP_FINISH) {
                 FinanceIncomePayService::saveGetId($data);
             }
         }
         return $res;
     }
-    
+
     /**
      *
      */

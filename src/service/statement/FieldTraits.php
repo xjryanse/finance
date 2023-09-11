@@ -1,18 +1,18 @@
 <?php
 
-namespace xjryanse\finance\service;
+namespace xjryanse\finance\service\statement;
 
 /**
- * 财务成本统计项目
+ * 分页复用列表
  */
-class FinanceStaticsItemService {
-
-    use \xjryanse\traits\InstTrait;
-    use \xjryanse\traits\MainModelTrait;
-    use \xjryanse\traits\MainModelQueryTrait;
-
-    protected static $mainModel;
-    protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceStaticsItem';
+trait FieldTraits{
+    
+    /**
+     *
+     */
+    public function fAppId() {
+        return $this->getFFieldValue(__FUNCTION__);
+    }
 
     /**
      *
@@ -36,6 +36,38 @@ class FinanceStaticsItemService {
     }
 
     /**
+     * 客户id
+     */
+    public function fCustomerId() {
+        return $this->getFFieldValue(__FUNCTION__);
+    }
+
+    /**
+     * 结束时间
+     */
+    public function fEndTime() {
+        return $this->getFFieldValue(__FUNCTION__);
+    }
+
+    /**
+     * 客户已确认（0：未确认，1：已确认）
+     */
+    public function fHasConfirm() {
+        return $this->getFFieldValue(__FUNCTION__);
+    }
+
+    /**
+     * 已收款
+     */
+    public function fHasSettle() {
+        return $this->getFFieldValue(__FUNCTION__);
+    }
+
+    public function fBusierId() {
+        return $this->getFFieldValue(__FUNCTION__);
+    }
+
+    /**
      * 有使用(0否,1是)
      */
     public function fHasUsed() {
@@ -46,6 +78,10 @@ class FinanceStaticsItemService {
      *
      */
     public function fId() {
+        return $this->getFFieldValue(__FUNCTION__);
+    }
+
+    public function fOrderId() {
         return $this->getFFieldValue(__FUNCTION__);
     }
 
@@ -64,6 +100,13 @@ class FinanceStaticsItemService {
     }
 
     /**
+     * 应付金额
+     */
+    public function fNeedPayPrize() {
+        return $this->getFFieldValue(__FUNCTION__);
+    }
+
+    /**
      * 备注
      */
     public function fRemark() {
@@ -74,6 +117,31 @@ class FinanceStaticsItemService {
      * 排序
      */
     public function fSort() {
+        return $this->getFFieldValue(__FUNCTION__);
+    }
+
+    /**
+     * 开始时间
+     */
+    public function fStartTime() {
+        return $this->getFFieldValue(__FUNCTION__);
+    }
+
+    /**
+     * 对账单类型
+     */
+    public function fStatementCate() {
+        return $this->getFFieldValue(__FUNCTION__);
+    }
+
+    /**
+     * 对账单名称
+     */
+    public function fStatementName() {
+        return $this->getFFieldValue(__FUNCTION__);
+    }
+
+    public function fStatementType() {
         return $this->getFFieldValue(__FUNCTION__);
     }
 
@@ -97,5 +165,4 @@ class FinanceStaticsItemService {
     public function fUpdater() {
         return $this->getFFieldValue(__FUNCTION__);
     }
-
 }

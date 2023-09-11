@@ -1,18 +1,17 @@
 <?php
 
-namespace xjryanse\finance\service;
+namespace xjryanse\finance\service\statementOrder;
 
 /**
- * 财务成本统计项目
+ * 分页复用列表
  */
-class FinanceStaticsItemService {
-
-    use \xjryanse\traits\InstTrait;
-    use \xjryanse\traits\MainModelTrait;
-    use \xjryanse\traits\MainModelQueryTrait;
-
-    protected static $mainModel;
-    protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceStaticsItem';
+trait FieldTraits{
+    /**
+     *
+     */
+    public function fAppId() {
+        return $this->getFFieldValue(__FUNCTION__);
+    }
 
     /**
      *
@@ -32,6 +31,13 @@ class FinanceStaticsItemService {
      * 创建者，user表
      */
     public function fCreater() {
+        return $this->getFFieldValue(__FUNCTION__);
+    }
+
+    /**
+     * 客户id
+     */
+    public function fCustomerId() {
         return $this->getFFieldValue(__FUNCTION__);
     }
 
@@ -64,6 +70,34 @@ class FinanceStaticsItemService {
     }
 
     /**
+     * 应付金额
+     */
+    public function fNeedPayPrize() {
+        return $this->getFFieldValue(__FUNCTION__);
+    }
+
+    /**
+     * 订单id
+     */
+    public function fOrderId() {
+        return $this->getFFieldValue(__FUNCTION__);
+    }
+
+    /**
+     * 订单金额
+     */
+    public function fOrderPrize() {
+        return $this->getFFieldValue(__FUNCTION__);
+    }
+
+    /**
+     * 已付金额
+     */
+    public function fPayPrize() {
+        return $this->getFFieldValue(__FUNCTION__);
+    }
+
+    /**
      * 备注
      */
     public function fRemark() {
@@ -74,6 +108,13 @@ class FinanceStaticsItemService {
      * 排序
      */
     public function fSort() {
+        return $this->getFFieldValue(__FUNCTION__);
+    }
+
+    /**
+     * 对账单id
+     */
+    public function fStatementId() {
         return $this->getFFieldValue(__FUNCTION__);
     }
 

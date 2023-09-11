@@ -4,6 +4,7 @@ namespace xjryanse\finance\service;
 
 use xjryanse\finance\service\FinanceIncomePayService;
 use Exception;
+
 /**
  * 收款单
  */
@@ -11,65 +12,64 @@ class FinanceIncomeService {
 
     use \xjryanse\traits\InstTrait;
     use \xjryanse\traits\MainModelTrait;
+    use \xjryanse\traits\MainModelQueryTrait;
 
     protected static $mainModel;
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceIncome';
-    
-    public function delete()
-    {
+
+    public function delete() {
         //多表删除需事务
         self::checkTransaction();
         //执行主表删除
         $res = $this->commDelete();
         //删除收款关联订单
-        $con[] = ['income_id','=',$this->uuid];
-        $lists = FinanceIncomeOrderService::lists( $con );
-        foreach( $lists as $key=>$value){
-            if( $value['income_status'] == XJRYANSE_OP_FINISH){
-                throw new Exception('收款单对应订单已完成收款，收款单不可删除。记录id：'.$value['id']);
+        $con[] = ['income_id', '=', $this->uuid];
+        $lists = FinanceIncomeOrderService::lists($con);
+        foreach ($lists as $key => $value) {
+            if ($value['income_status'] == XJRYANSE_OP_FINISH) {
+                throw new Exception('收款单对应订单已完成收款，收款单不可删除。记录id：' . $value['id']);
             }
             //删除
-            FinanceIncomeOrderService::getInstance( $value['id'] )->delete();
+            FinanceIncomeOrderService::getInstance($value['id'])->delete();
         }
-        
+
         //删除支付单
-        $incomePays = FinanceIncomePayService::lists( $con );
-        foreach( $incomePays as $v){
-            FinanceIncomePayService::getInstance( $v['id'] )->delete();
+        $incomePays = FinanceIncomePayService::lists($con);
+        foreach ($incomePays as $v) {
+            FinanceIncomePayService::getInstance($v['id'])->delete();
         }
 
         return $res;
-    }    
+    }
+
     /**
      * 
      * @param type $data
      */
-    public static function save( $data )
-    {
+    public static function save($data) {
         $res = self::commSave($data);
-        if(isset($data['order_id'])){
+        if (isset($data['order_id'])) {
             $data['income_id'] = $res['id'];
             FinanceIncomeOrderService::save($data);
             //收款单
-            if(isset($data['income_status']) && $data['income_status'] == XJRYANSE_OP_FINISH){
+            if (isset($data['income_status']) && $data['income_status'] == XJRYANSE_OP_FINISH) {
                 FinanceIncomePayService::saveGetId($data);
             }
         }
         return $res;
     }
-    
+
     /**
      * 更新
      * @param array $data
      * @return type
      * @throws Exception
      */
-    public function update( array $data )
-    {
+    public function update(array $data) {
         $payBy = FinanceIncomePayService::columnPayByByIncomeId($this->uuid);
         $data['pay_by'] = implode(',', $payBy); //支付来源
         //预保存数据
-        if($this->get()){
+        if ($this->get()) {
             return $this->commUpdate($data);
         }
     }
@@ -103,10 +103,11 @@ class FinanceIncomeService {
     public function fCompanyId() {
         return $this->getFFieldValue(__FUNCTION__);
     }
-    
+
     public function fOrderId() {
         return $this->getFFieldValue(__FUNCTION__);
     }
+
     /**
      * 收款单号
      */

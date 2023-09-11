@@ -7,6 +7,8 @@ use xjryanse\finance\service\FinanceStatementService;
 use xjryanse\finance\service\FinanceAccountLogService;
 use xjryanse\logic\Debug;
 use xjryanse\logic\Arrays;
+use xjryanse\logic\Arrays2d;
+use Exception;
 
 /**
  * 多个收付款步骤合成一个的逻辑；
@@ -58,9 +60,10 @@ class PackLogic
      * @param type $statementOrderId    对账单id，用于关联获取客户信息（付款存在多客户情况）
      * @return type
      */
-    public static function financeDealRam($orderId,$accountId,$money, $stOrData=[], $prizeKey='' ,$statementOrderId=''){
+    public static function financeDealRam($orderId,$accountId,$money, $stOrData=[], $prizeKey='' ,$statementOrderId='', $data = []){
+        // dump(func_get_args());
         //20220622,增加原始账单获取
-        $statementOrderInfo = FinanceStatementOrderService::getInstance($statementOrderId)->get();
+        $statementOrderInfo = $statementOrderId ? FinanceStatementOrderService::getInstance($statementOrderId)->get() : [];
         if(!$statementOrderInfo || $statementOrderInfo['need_pay_prize'] != $money){
             //步骤①创建一笔收款明细
             $stOrData['customer_id'] = Arrays::value($statementOrderInfo, 'customer_id');
@@ -71,25 +74,78 @@ class PackLogic
         $data['statementOrderIds']  = [$statementOrderInfo['id']];
         $data['has_confirm']        = 1;
         $statementInfo              = FinanceStatementService::saveRam( $data );
+//        $res = FinanceStatementService::getInstance($statementInfo['id'])->objAttrsList('financeStatementOrder');
+//        dump('financeDealRam');
+//        dump($res);
         //步骤③收款入账
         $accountData['account_id']      =  $accountId;
         $accountData['statement_id']    =  $statementInfo['id'];
         $accountData['bill_time']       =  Arrays::value($stOrData,'bill_time',date('Y-m-d H:i:s'));
         $res = FinanceAccountLogService::saveRam($accountData);
         //更新订单的费用信息（多退少补）；
-        /*
-        $orderInfo  = OrderService::getInstance( $orderId )->get();
-        FinanceStatementOrderService::updateOrderMoneyRam($orderId, $orderInfo['order_prize']);
-         */
-        //OrderService::getInstance($orderId)->updateFinanceStatementRam();
-        //throw new \Exception('测试');
         return $res;
     }
+    /**
+     * 20220731：批量
+     * 
+     * @param type $orderArr
+     * ['order_id'=>$orderId,'sub_id'=>'','need_pay_prize'=>$prize']
+     * @param type $orderId
+     * @param type $accountId
+     * @param type $money
+     * @param type $stOrData
+     * @param type $prizeKey
+     * @param type $statementOrderId
+     * @return type
+     */
+    public static function financeDealBatchRam($orderArr, $accountId, $stOrData=[], $prizeKey='', $data=[]){
+        //【1】校验同一客户账单
+        $orderIds       = array_column($orderArr,'order_id');
+        $cond[]         = ['id','in',$orderIds];
+        // $orderLists     = OrderService::mainModel()->where($cond)->select();
+        $orderLists     = OrderService::lists($cond);
+        $orderListsArr  = $orderLists ? $orderLists->toArray() : [];
+        $orderListsObj  = Arrays2d::fieldSetKey($orderListsArr, 'id');
+        if(count(array_unique(array_column($orderListsArr,'customer_id'))) > 1){
+            // 2023-02-27：付款有bug注释；
+            // throw new Exception('请选择同一客户订单');
+        }
+        //20221024：属性批量提取一次，降低重复查询性能开销。
+        OrderService::objAttrsListBatch('financeStatementOrder', $orderIds);        
+        OrderService::objAttrsListBatch('orderBuses', $orderIds);        
+        // 【2】生成账单
+        $statementOrderInfoArr = [];
+        foreach($orderArr as &$v){
+            $dataSt                     = $stOrData;
+            $dataSt['sub_id']           = Arrays::value($v, 'sub_id');
+            $dataSt['customer_id']      = Arrays::value($v, 'customer_id')?: Arrays::value($orderListsObj[$v['order_id']], 'customer_id');
+            $dataSt['user_id']          = Arrays::value($v, 'user_id')?: Arrays::value($orderListsObj[$v['order_id']], 'user_id');
+            //20220803:预写，以免被清
+            $dataSt['has_statement']    = 1;
+            $dataSt['has_settle']       = 1;
+            
+            $statementOrderInfo         = FinanceStatementOrderService::prizeKeySaveRam($prizeKey, $v['order_id'], $v['need_pay_prize'],$dataSt);
+            $data['statementOrderIds'][] = $statementOrderInfo['id'];
+            $statementOrderInfoArr[]    = $statementOrderInfo;
+        }
+
+        $data['has_confirm']        = 1;
+        $statementInfo              = FinanceStatementService::saveRam( $data );
+        //【3】收款入账
+        $accountData['account_id']      =  $accountId;
+        $accountData['statement_id']    =  $statementInfo['id'];
+        $accountData['bill_time']       =  Arrays::value($stOrData,'bill_time',date('Y-m-d H:i:s'));
+        $res = FinanceAccountLogService::saveRam($accountData);
+
+        return $res;
+    }
+
+    
     /**
      * 20220609 后台创建订单，对外付款
      */
     public static function financeOutcomeAdm($orderId,$accountId,$money,$stOrData = [], $prizeKey = 'sellerGoodsPrize'){
-        $statementOrderInfo = FinanceStatementOrderService::prizeKeySave($prizeKey, $orderId, $money,$stOrData);
+        $statementOrderInfo         = FinanceStatementOrderService::prizeKeySave($prizeKey, $orderId, $money,$stOrData);
         //步骤②生成账单
         $data['statementOrderIds']  = [$statementOrderInfo['id']];
         $data['has_confirm']        = 1;

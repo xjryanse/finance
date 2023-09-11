@@ -4,6 +4,7 @@ namespace xjryanse\finance\service;
 
 use xjryanse\system\interfaces\MainModelInterface;
 use Exception;
+
 /**
  * 
  */
@@ -11,6 +12,7 @@ class FinanceStaffFeeListService implements MainModelInterface {
 
     use \xjryanse\traits\InstTrait;
     use \xjryanse\traits\MainModelTrait;
+    use \xjryanse\traits\MainModelQueryTrait;
 
     protected static $mainModel;
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceStaffFeeList';
@@ -24,14 +26,8 @@ class FinanceStaffFeeListService implements MainModelInterface {
         self::stopUse(__METHOD__);
     }
 
-    /**
-     * 钩子-保存后
-     */
-    public static function extraAfterSave(&$data, $uuid) {
-        $info = self::getInstance($uuid)->get();
-        if ($info['fee_id']) {
-            FinanceStaffFeeService::getInstance($info['fee_id'])->feeMoneyUpdate();
-        }
+    public static function ramPreSave(&$data, $uuid) {
+
     }
     /**
      * 
@@ -41,16 +37,15 @@ class FinanceStaffFeeListService implements MainModelInterface {
     public static function ramAfterSave(&$data, $uuid) {
         $info = self::getInstance($uuid)->get();
         if ($info['fee_id']) {
-            FinanceStaffFeeService::getInstance($info['fee_id'])->objAttrsPush('financeStaffFeeList',$info);
             FinanceStaffFeeService::getInstance($info['fee_id'])->feeMoneyUpdateRam();
         }
     }
-    
+
     public static function ramAfterUpdate(&$data, $uuid) {
         $info = self::getInstance($uuid)->get();
         if ($info['fee_id']) {
             $upData = is_object($info) ? $info->toArray() : [];
-            FinanceStaffFeeService::getInstance($info['fee_id'])->objAttrsUpdate('financeStaffFeeList',$uuid, $upData);
+            FinanceStaffFeeService::getInstance($info['fee_id'])->objAttrsUpdate('financeStaffFeeList', $uuid, $upData);
             FinanceStaffFeeService::getInstance($info['fee_id'])->feeMoneyUpdateRam();
         }
     }
@@ -58,14 +53,13 @@ class FinanceStaffFeeListService implements MainModelInterface {
     public function ramPreDelete() {
         $info = $this->get();
         $staffFeeInfo = FinanceStaffFeeService::getInstance($info['fee_id'])->get();
-        if($staffFeeInfo['has_settle']){
+        if ($staffFeeInfo['has_settle']) {
             throw new Exception('报销单已支付不可删');
         }
 
-        FinanceStaffFeeService::getInstance($info['fee_id'])->objAttrsUnSet('financeStaffFeeList',$this->uuid);
-        FinanceStaffFeeService::getInstance($info['fee_id'])->feeMoneyUpdateRam();        
+        FinanceStaffFeeService::getInstance($info['fee_id'])->objAttrsUnSet('financeStaffFeeList', $this->uuid);
+        FinanceStaffFeeService::getInstance($info['fee_id'])->feeMoneyUpdateRam();
     }
-
 
     /**
      * 钩子-删除后
@@ -73,7 +67,7 @@ class FinanceStaffFeeListService implements MainModelInterface {
     public function ramAfterDelete() {
         
     }
-    
+
     /**
      * 钩子-更新前
      */

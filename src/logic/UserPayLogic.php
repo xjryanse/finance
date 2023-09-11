@@ -2,6 +2,8 @@
 namespace xjryanse\finance\logic;
 
 use xjryanse\finance\service\FinanceIncomePayService;
+use xjryanse\finance\service\FinanceStatementService;
+use xjryanse\logic\Arrays;
 /**
  * 用户支付逻辑
  */
@@ -71,6 +73,27 @@ class UserPayLogic
     public static function secCollect ( $statementId , $payBy ,$thirdPayParam = []){
         //动态执行各支付方式的映射类库
         $res = call_user_func([self::$baseNamespace. ucfirst($payBy), 'secCollect'],$statementId, $thirdPayParam);
+        return $res;
+    }
+    
+    
+    /**
+     * 收款单id进行支付操作
+     * @param type $incomeId        收款单id
+     * @param type $payBy           用啥支付
+     * @param type $thirdPayParam   用于传第三方支付所需参数
+     * @return type
+     */
+    public static function cancel( $statementId )
+    {
+        $info   = FinanceStatementService::getInstance($statementId)->get();
+        $payBy  = Arrays::value($info, 'pay_by');
+        if(!$payBy){
+            return true;
+        }
+        //动态执行各支付方式的映射类库
+        //20210924，增加$money兼容组合支付
+        $res = call_user_func([self::$baseNamespace. ucfirst($payBy), 'cancel'], $statementId);
         return $res;
     }
 }

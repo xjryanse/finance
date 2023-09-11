@@ -1,21 +1,11 @@
 <?php
 
-namespace xjryanse\finance\service;
-
-use Exception;
+namespace xjryanse\finance\service\accountLog;
 
 /**
- * 开票记录
+ * 分页复用列表
  */
-class FinanceReceiptService {
-
-    use \xjryanse\traits\InstTrait;
-    use \xjryanse\traits\MainModelTrait;
-    use \xjryanse\traits\MainModelQueryTrait;
-
-    protected static $mainModel;
-    protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceReceipt';
-
+trait FieldTraits{
     /**
      *
      */
@@ -38,121 +28,86 @@ class FinanceReceiptService {
     }
 
     /**
-     * 付款单号
+     * 账户id，finance_account表
      */
-    public function fOutcomeSn() {
+    public function fAccountId() {
         return $this->getFFieldValue(__FUNCTION__);
     }
 
     /**
-     * 付款类型：
+     * 账号
      */
-    public function fOutcomeType() {
+    public function fEAccountNo() {
         return $this->getFFieldValue(__FUNCTION__);
     }
 
     /**
-     * 付款状态//1待收款、2已收款、3订单取消
+     * 1进账，2出账
      */
-    public function fOutcomeStatus() {
+    public function fChangeType() {
         return $this->getFFieldValue(__FUNCTION__);
     }
 
     /**
-     * 付款金额
+     * 金额
      */
     public function fMoney() {
         return $this->getFFieldValue(__FUNCTION__);
     }
 
     /**
-     * 付款描述
+     * 异动原因
      */
-    public function fDescribe() {
+    public function fReason() {
         return $this->getFFieldValue(__FUNCTION__);
     }
 
     /**
-     * 客户id，tr_customer表
+     * 单据类型
+     */
+    public function fBillType() {
+        return $this->getFFieldValue(__FUNCTION__);
+    }
+
+    /**
+     * 单据号
+     */
+    public function fBillSn() {
+        return $this->getFFieldValue(__FUNCTION__);
+    }
+
+    /**
+     * 资金变动时间
+     */
+    public function fBillTime() {
+        return $this->getFFieldValue(__FUNCTION__);
+    }
+
+    /**
+     * 来源表
+     */
+    public function fFromTable() {
+        return $this->getFFieldValue(__FUNCTION__);
+    }
+
+    /**
+     * 来源表id
+     */
+    public function fFromTableId() {
+        return $this->getFFieldValue(__FUNCTION__);
+    }
+
+    /**
+     * 付款客户id
      */
     public function fCustomerId() {
         return $this->getFFieldValue(__FUNCTION__);
     }
 
     /**
-     * 支付单号
+     * 付款人
      */
-    public function fPaySn() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
-
-    /**
-     * 支付渠道
-     */
-    public function fPayFrom() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
-
-    /**
-     * 支付用户id
-     */
-    public function fPayUserId() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
-
-    /**
-     * 支付用户姓名
-     */
-    public function fPayUserName() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
-
-    /**
-     * 付款人id
-     */
-    public function fOutcomeUserId() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
-
-    /**
-     * 付款人姓名
-     */
-    public function fOutcomeUserName() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
-
-    /**
-     * 付款时间
-     */
-    public function fOutcomeTime() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
-
-    /**
-     * 入账状态：0未入账，1已入账
-     */
-    public function fIntoAccount() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
-
-    /**
-     * 财务入账人id
-     */
-    public function fIntoAccountUserId() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
-
-    /**
-     * 财务入账人姓名
-     */
-    public function fIntoAccountUserName() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
-
-    /**
-     * 入账时间
-     */
-    public function fIntoAccountTime() {
+    public function fUserId() {
         return $this->getFFieldValue(__FUNCTION__);
     }
 
@@ -225,5 +180,4 @@ class FinanceReceiptService {
     public function fUpdateTime() {
         return $this->getFFieldValue(__FUNCTION__);
     }
-
 }

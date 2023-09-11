@@ -13,11 +13,13 @@ class FinanceRefundService {
 
     use \xjryanse\traits\InstTrait;
     use \xjryanse\traits\MainModelTrait;
+    use \xjryanse\traits\MainModelQueryTrait;
 
     protected static $mainModel;
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceRefund';
     //直接执行后续触发动作
     protected static $directAfter = true;
+
     /*
      * 获取订单费用
      * @param type $orderId     订单id
