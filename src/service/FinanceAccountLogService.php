@@ -3,6 +3,8 @@
 namespace xjryanse\finance\service;
 
 use xjryanse\logic\Arrays;
+use think\Db;
+use Exception;
 
 /**
  * 账户流水表
@@ -11,7 +13,12 @@ class FinanceAccountLogService {
 
     use \xjryanse\traits\InstTrait;
     use \xjryanse\traits\MainModelTrait;
+    use \xjryanse\traits\MainModelRamTrait;
+    use \xjryanse\traits\MainModelCacheTrait;
+    use \xjryanse\traits\MainModelCheckTrait;
+    use \xjryanse\traits\MainModelGroupTrait;
     use \xjryanse\traits\MainModelQueryTrait;
+
     use \xjryanse\traits\StaticsModelTrait;
     use \xjryanse\traits\ObjectAttrTrait;
 
@@ -23,8 +30,10 @@ class FinanceAccountLogService {
     protected static $callStatics = true;
 
     use \xjryanse\finance\service\accountLog\FieldTraits;
+    use \xjryanse\finance\service\accountLog\ListTraits;
     use \xjryanse\finance\service\accountLog\TriggerTraits;
-    
+    use \xjryanse\finance\service\accountLog\PaginateTraits;
+
     public static function extraDetails($ids) {
         return self::commExtraDetails($ids, function($lists) use ($ids) {
             // $logArr = WechatWePubTemplateMsgLogService::groupBatchCount('from_table_id', $ids);
@@ -50,7 +59,10 @@ class FinanceAccountLogService {
         }
         //来源表有记录，则报错
         if ($info['from_table'] && $info['from_table_id']) {
-            if (Db::table($info['from_table'])->where('id', $info['from_table_id'])->find()) {
+            $conc = [['from_table','=',$info['from_table']],['from_table_id','=',$info['from_table_id']]];
+            $count = self::where($conc)->count();
+            // 20240727:如果不止一条，可能是程序写错了，后期核查需要删除
+            if ($count == 1 && Db::table($info['from_table'])->where('id', $info['from_table_id'])->find()) {
                 throw new Exception('请先删除' . $info['from_table'] . '表,id为' . $info['from_table_id'] . '的记录');
             }
         }
@@ -191,5 +203,11 @@ class FinanceAccountLogService {
         $groupFields = ['account_id', 'dept_id'];
         return self::staticsYearly($year, $moneyTypeN, 'bill_time', $groupFields, 'moneyType', $dynArrs);
     }
-
+    /**
+     * 20240303
+     */
+    public function doOrderTypeUpdate(){
+        $data['statement_id'] = $this->fStatementId();
+        return $this->updateRam($data);
+    }
 }

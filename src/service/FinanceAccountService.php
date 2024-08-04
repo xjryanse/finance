@@ -18,7 +18,12 @@ class FinanceAccountService {
 
     use \xjryanse\traits\InstTrait;
     use \xjryanse\traits\MainModelTrait;
+    use \xjryanse\traits\MainModelRamTrait;
+    use \xjryanse\traits\MainModelCacheTrait;
+    use \xjryanse\traits\MainModelCheckTrait;
+    use \xjryanse\traits\MainModelGroupTrait;
     use \xjryanse\traits\MainModelQueryTrait;
+
     use \xjryanse\traits\StaticModelTrait;
 
     protected static $mainModel;
@@ -153,6 +158,15 @@ class FinanceAccountService {
         $con[] = ['accept_msg', '=', 1];
         return self::where($con)->column('id');
     }
-
+    /**
+     * 提取手工记账的id列表
+     * @describe listForDailyOutcomeList使用
+     * 20231115
+     */
+    public static function calHandleAccountIds($con = []){
+        $con[] = ['is_handle','=',1];
+        return self::where($con)->column('id');
+    }
+    
 
 }

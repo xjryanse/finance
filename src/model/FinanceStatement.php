@@ -41,7 +41,7 @@ class FinanceStatement extends Base
             'uni_name'  =>'customer',
             'uni_field' =>'id',
             'in_list'   => false,
-            'in_statics'=> false,
+            // 'in_statics'=> false,
             'in_exist'  => true,
             'del_check' => false,
         ],

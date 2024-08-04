@@ -9,6 +9,7 @@ use xjryanse\logic\DbOperate;
 use xjryanse\order\service\OrderService;
 use xjryanse\finance\service\FinanceStatementService;
 use xjryanse\finance\service\FinanceManageAccountService;
+use xjryanse\goods\service\GoodsPrizeKeyService;
 use xjryanse\finance\logic\PackLogic;
 use Exception;
 
@@ -19,6 +20,7 @@ trait TriggerTraits {
 
     public function extraPreDelete() {
         Debug::debug(__CLASS__ . __FUNCTION__);
+        $this->checkCanDelete();
         self::checkTransaction();
         $info = $this->get();
         if ($info['has_statement'] || $info['statement_id']) {
@@ -222,6 +224,7 @@ trait TriggerTraits {
      */
     public function ramPreDelete() {
         self::queryCountCheck(__METHOD__);
+        $this->checkCanDelete();
         //有前序关联订单，先删前序
         $info = $this->get();
         if ($info['has_settle']) {
@@ -260,12 +263,19 @@ trait TriggerTraits {
      * @param type $uuid
      */
     public static function ramPreSave(&$data, $uuid) {
-        $keys = ['need_pay_prize', 'statement_cate', 'statement_type'];
-        //$notices['order_id']          = '订单id必须';        
-        $notices['need_pay_prize'] = '金额必须';
+        $data['statement_cate'] = GoodsPrizeKeyService::keyBelongRole($data['statement_type']);
+        // dump($data);
+        // throw new Exception('调试中');
+        $keys = ['statement_cate', 'statement_type'];
+        //$notices['order_id']          = '订单id必须';
+        // $notices['need_pay_prize'] = '金额必须';
         $notices['statement_cate'] = '对账分类必须';
         $notices['statement_type'] = '费用类型必须';
         DataCheck::must($data, $keys, $notices);
+
+        if(!Arrays::value($data, 'need_pay_prize') && !Arrays::value($data, 'is_un_prize')){
+           // throw new Exception('金额不能为0'); 
+        }
 
         $orderId = Arrays::value($data, 'order_id');
         $statementCate = Arrays::value($data, 'statement_cate');
@@ -335,6 +345,8 @@ trait TriggerTraits {
         if (!Arrays::value($data, 'customer_id') && !Arrays::value($data, 'user_id')) {
             throw new Exception('customer_id和user_id需至少有一个有值');
         }
+        // 20231030:增加冗余字段
+        self::redunFields($data);
     }
 
     public static function ramAfterSave(&$data, $uuid) {
@@ -361,6 +373,16 @@ trait TriggerTraits {
         $info = self::getInstance($uuid)->get(0);
         self::dealFinanceCallBack($info);
     }
+    
+    public static function ramPreUpdate(&$data, $uuid) {
+        // 20231030:增加冗余字段
+        self::redunFields($data);
+        // 20240419：更新
+        if(Arrays::value($data, 'statement_type')){
+            $prizeKey               = Arrays::value($data, 'statement_type');
+            $data['statement_cate'] = GoodsPrizeKeyService::keyBelongRole($prizeKey);
+        }
+    }
 
     /**
      * 更新后
@@ -368,9 +390,14 @@ trait TriggerTraits {
      * @param type $uuid
      */
     public static function ramAfterUpdate(&$data, $uuid) {
-        $info = self::getInstance($uuid)->get(0);
+        $info           = self::getInstance($uuid)->get(0);
+        $statementId    = Arrays::value($info, 'statement_id');
+        $statementInfo  = FinanceStatementService::getInstance($statementId)->get();
+        if(Arrays::value($statementInfo, 'has_confirm') && self::updateDiffsHasField(['need_pay_prize'])){
+            throw new Exception('已交款不可修改:'.$uuid);
+        }
+        
         $orderId = Arrays::value($info, 'order_id');
-        $statementId = Arrays::value($info, 'statement_id');
         OrderService::getInstance($orderId)->objAttrsUpdate('financeStatementOrder', $uuid, $data);
         if ($statementId) {
             FinanceStatementService::getInstance($statementId)->objAttrsUpdate('financeStatementOrder', $uuid, $data);
@@ -383,5 +410,78 @@ trait TriggerTraits {
         }
         // 20230806:策略模式:处理回调
         self::dealFinanceCallBack($info);
+        // 20240122:同步源表
+        self::getInstance($uuid)->updateBelongTableFinance();
     }
+
+    /**
+     * 冗余字段
+     */
+    public static function redunFields(&$data){
+        if(isset($data['customer_id']) && isset($data['user_id'])){
+            $customerId     = Arrays::value($data, 'customer_id');
+            $userId         = Arrays::value($data, 'user_id');
+            $data['manage_account_id'] = FinanceManageAccountService::manageAccountId($customerId, $userId);
+        }
+        // 20240119：增加!Arrays::value($data, 'belong_table')
+        if(Arrays::value($data, 'order_id') && !Arrays::value($data, 'belong_table')){
+            $data['belong_table']       = OrderService::getTable();
+            $data['belong_table_id']    = $data['order_id'];
+        }
+    }
+    
+    
+    /**
+     * 验证账单是否能删
+     */
+    protected function checkCanDelete(){
+        $info       = $this->get();
+        $isNeedPay  = Arrays::value($info, 'is_needpay');
+        if($isNeedPay){
+            // 20231101；销账bug
+            throw new Exception('账单明细应付，不可删除');
+        }
+    }
+    /**
+     * 20240122
+     * @return bool
+     */
+    public function updateBelongTableFinance(){
+        $info           = $this->get();
+        $belongTable    = Arrays::value($info, 'belong_table');
+        $belongTableId  = Arrays::value($info, 'belong_table_id');
+        if(!$belongTable || !$belongTableId){
+            return true;
+        }
+        $service    = DbOperate::getService($belongTable);
+        
+        if(method_exists($service, 'updateFinanceRam')){
+            // dump('看我这里');
+            // 财务端回调
+            $service::getInstance($belongTableId)->updateFinanceRam();
+        }
+    }
+    
+    /**
+     * 来源表账单更新
+     */
+    /*
+    public function belongTableStatementOrderSync(){
+        // return false;
+        // 先结算，再查
+        DbOperate::dealGlobal();
+
+        $info           = $this->get();
+        $belongTable    = Arrays::value($info, 'belong_table');
+        $belongTableId  = Arrays::value($info, 'belong_table_id');
+        if(!$belongTable || !$belongTableId){
+            return true;
+        }
+        $service    = DbOperate::getService($belongTable);
+        if(method_exists($service, 'addStatementOrder')){
+            // 此方法应该 use \xjryanse\traits\FinanceSourceModelTrait;
+            $service::getInstance($belongTableId)->addStatementOrder();
+        }
+    }
+    */
 }

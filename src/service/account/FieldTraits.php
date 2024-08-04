@@ -16,7 +16,7 @@ trait FieldTraits{
     /**
      *
      */
-    public function fAppId() {
+    public function fCanZero() {
         return $this->getFFieldValue(__FUNCTION__);
     }
 

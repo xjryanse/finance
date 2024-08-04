@@ -2,6 +2,8 @@
 
 namespace xjryanse\finance\service\statementOrder;
 
+use xjryanse\finance\service\FinanceStatementService;
+use xjryanse\logic\Arrays2d;
 /**
  * 计算类
  */
@@ -32,5 +34,25 @@ trait CalTraits{
         $con[] = ['user_id','in',$userId];
         return self::sumToPay($con);
     }
+    /**
+     * 计算账单的statement_type值
+     * @createTime 2023-11-13
+     */
+    public static function calStatementTypeByStatementId($statementId){
+        $lists          = FinanceStatementService::getInstance($statementId)->objAttrsList('financeStatementOrder');
+        $statementTypes = Arrays2d::uniqueColumn($lists,'statement_type');
+        return count($statementTypes) >1 ? 'mixed':$statementTypes[0];
+    }
+    /**
+     * 计算账单来源表id数组
+     * @param type $statementId
+     */
+    public static function calStatementBelongTableIds($statementId){
+        $con            = [];
+        $con[]          = ['statement_id','in',$statementId];
 
+        $belongTableIds = self::where($con)->column('belong_table_id');
+        return $belongTableIds;
+    }
+    
 }

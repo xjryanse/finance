@@ -10,13 +10,25 @@ use xjryanse\logic\Cachex;
 use Exception;
 
 /**
+ * 1: baoOrder 锁定包车订单不可调整客户；下单人；单价；
+ * 2: baoFinanceStaffFee 锁定包车订单费用不可报销
+ * 3: baoBusDriverFee 锁定司机补贴不可调整。
+ * 4: 工资使用salary板块的lock
  * 
  */
 class FinanceTimeService implements MainModelInterface {
 
     use \xjryanse\traits\InstTrait;
     use \xjryanse\traits\MainModelTrait;
+    use \xjryanse\traits\MainModelRamTrait;
+    use \xjryanse\traits\MainModelCacheTrait;
+    use \xjryanse\traits\MainModelCheckTrait;
+    use \xjryanse\traits\MainModelGroupTrait;
     use \xjryanse\traits\MainModelQueryTrait;
+
+    use \xjryanse\finance\service\time\FieldTraits;
+    use \xjryanse\finance\service\time\TriggerTraits;
+    use \xjryanse\finance\service\time\BatchManageTraits;
 
     protected static $mainModel;
     protected static $mainModelClass = '\\xjryanse\\finance\\model\\FinanceTime';
@@ -50,22 +62,35 @@ class FinanceTimeService implements MainModelInterface {
         //开始日期，已有账期最后一个日期+一天
         $startTime = $info ? date('Y-m-d H:i:s', strtotime($info['to_time']) + 86400) : date('Y-01-01 00:00:00');
 
-        $arr = Datetime::getWithinMonth($startTime, $endTime);
+        $arr        = Datetime::getWithinMonth($startTime, $endTime);
+        
+        $keysArr    = FinanceTimeKeyService::keysForInit();
+
         foreach ($arr as $v) {
             $data = [];
             $data['belong_time'] = $v;
             $data['from_time'] = $v . '-01 00:00:00';
             $data['to_time'] = date('Y-m-d 23:59:59', strtotime('+1 month -1 day', strtotime($v . '-01')));
+            // 子事项
+            foreach($keysArr as $keyItem){
+                $data['dept_id']    = Arrays::value($keyItem, 'dept_id');
+                $data['thing_key']  = Arrays::value($keyItem, 'thing_key');
+                self::save($data);
+            }
+            $data['dept_id']    = null;
+            $data['thing_key']  = null;
+            
             self::save($data);
         }
     }
 
     /**
      * 20220617:设定缓存；一般用于锁账后；
+     * 20240522:直接清理掉，比较符合习惯
      */
     protected static function setLockTimeArrCache() {
         $cacheKey = __CLASS__ . 'getLockTimesArr';
-        return Cachex::set($cacheKey, function() {
+        return Cachex::rm($cacheKey, function() {
                     return self::lockTimeArrDb();
                 }, true);
     }
@@ -76,10 +101,12 @@ class FinanceTimeService implements MainModelInterface {
      * @return type
      */
     protected static function getLockTimesArrCache() {
-        $cacheKey = __CLASS__ . 'getLockTimesArr';
-        return Cachex::funcGet($cacheKey, function() {
-                    return self::lockTimeArrDb();
-                }, true);
+//        $cacheKey = __CLASS__ . 'getLockTimesArr';
+//        return Cachex::funcGet($cacheKey, function() {
+//                    return self::lockTimeArrDb();
+//                }, true);
+                
+        return self::lockTimeArrDb();
     }
 
     /**
@@ -88,18 +115,33 @@ class FinanceTimeService implements MainModelInterface {
      */
     protected static function lockTimeArrDb() {
         $con[] = ['time_lock', '=', 1];
-        $lists = self::lists($con);
+        // 20240522:3秒缓存
+        $lists = self::lists($con,'','*','3');
         return $lists ? $lists->toArray() : [];
     }
 
     /**
      * 传入一个时间，获取被锁定的账期名
+     * @param type $time
+     * @param type $thingKey
+     * @param type $data
+     * @return bool
      */
-    public static function isTimeLock($time) {
+    public static function isTimeLock($time, $thingKey='', $deptId = '') {
         $lockArr = self::getLockTimesArrCache();
         foreach ($lockArr as &$v) {
+            // 时间范围匹配
             if ($v['from_time'] <= $time && $v['to_time'] >= $time) {
-                return $v['id'];
+                // 总的锁，则锁
+                if(!$v['thing_key'] || $v['thing_key'] == 'ALL'){
+                    return $v['id'];
+                }
+
+                // 事项锁
+                if($v['thing_key'] == $thingKey && $v['dept_id'] == $deptId){
+                    return $v['id'];
+                }
+
             }
         }
         return false;
@@ -108,240 +150,20 @@ class FinanceTimeService implements MainModelInterface {
     /**
      * 校验时间是否被锁
      * @param type $time
+     * @param type $thingKey    20240513增
+     * @param type $deptId      20240513增
      * @throws Exception
      */
-    public static function checkLock($time) {
-        $lockTimeId = self::isTimeLock($time);
+    public static function checkLock($time, $thingKey='', $deptId='') {
+        $lockTimeId = self::isTimeLock($time, $thingKey, $deptId);
         if ($lockTimeId) {
             $info = FinanceTimeService::getInstance($lockTimeId)->get();
             $lockUserId = $info['lock_user_id'];
             $userInfo = UserService::getInstance($lockUserId)->get();
             $namePhone = Arrays::value($userInfo, 'namePhone');
-            throw new Exception('账期' . $info['belong_time'] . '已被"' . $namePhone . '"锁定，请联系财务');
+            throw new Exception('账期' . $info['belong_time'] . '已被"' . $namePhone . '"锁定，请联系财务'.$thingKey.$deptId);
         }
     }
 
-    /**
-     * 钩子-保存前
-     */
-    public static function extraPreSave(&$data, $uuid) {
-        
-    }
-
-    /**
-     * 钩子-保存后
-     */
-    public static function extraAfterSave(&$data, $uuid) {
-
-        //20220617
-        self::setLockTimeArrCache();
-    }
-
-    /**
-     * 钩子-更新前
-     */
-    public static function extraPreUpdate(&$data, $uuid) {
-        if (Arrays::value($data, 'time_lock')) {
-            $info = self::getInstance($uuid)->get();
-            if (!Datetime::isExpire($info['to_time'])) {
-                throw new Exception('时间' . $info['to_time'] . '未过，还可能产生业务数据，不可关账');
-            }
-            $data['lock_user_id'] = session(SESSION_USER_ID);
-        } else {
-            if (isset($data['time_lock'])) {
-                $data['lock_user_id'] = null;
-            }
-        }
-    }
-
-    /**
-     * 钩子-更新后
-     */
-    public static function extraAfterUpdate(&$data, $uuid) {
-        //20220617
-        self::setLockTimeArrCache();
-    }
-
-    /**
-     * 钩子-删除前
-     */
-    public function extraPreDelete() {
-        
-    }
-
-    /**
-     * 钩子-删除后
-     */
-    public function extraAfterDelete() {
-        
-    }
-
-    /**
-     * 会计状态：0待审批；1已同意，2已拒绝
-     */
-    public function fAccStatus() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
-
-    /**
-     * 附件
-     */
-    public function fAnnex() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
-
-    /**
-     * 申请时间
-     */
-    public function fApplyTime() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
-
-    /**
-     * 业务状态：0待审批；1已同意，2已拒绝
-     */
-    public function fBossStatus() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
-
-    /**
-     * 车号
-     */
-    public function fBusId() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
-
-    /**
-     *
-     */
-    public function fCompanyId() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
-
-    /**
-     * 创建时间
-     */
-    public function fCreateTime() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
-
-    /**
-     * 创建者，user表
-     */
-    public function fCreater() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
-
-    /**
-     * 费用归属：office办公室；driver司机；
-     */
-    public function fFeeGroup() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
-
-    /**
-     * 报销单号
-     */
-    public function fFeeSn() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
-
-    /**
-     * 出纳状态：0待审批；1已同意，2已拒绝
-     */
-    public function fFinStatus() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
-
-    /**
-     * 有使用(0否,1是)
-     */
-    public function fHasUsed() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
-
-    /**
-     *
-     */
-    public function fId() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
-
-    /**
-     * 锁定（0：未删，1：已删）
-     */
-    public function fIsDelete() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
-
-    /**
-     * 锁定（0：未锁，1：已锁）
-     */
-    public function fIsLock() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
-
-    /**
-     * 报销金额
-     */
-    public function fMoney() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
-
-    /**
-     * 状态：0待支付；1已支付
-     */
-    public function fPayStatus() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
-
-    /**
-     * 备注
-     */
-    public function fRemark() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
-
-    /**
-     * 排序
-     */
-    public function fSort() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
-
-    /**
-     * 状态(0禁用,1启用)
-     */
-    public function fStatus() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
-
-    /**
-     * 报销类别
-     */
-    public function fType() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
-
-    /**
-     * 更新时间
-     */
-    public function fUpdateTime() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
-
-    /**
-     * 更新者，user表
-     */
-    public function fUpdater() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
-
-    /**
-     * 报销人
-     */
-    public function fUserId() {
-        return $this->getFFieldValue(__FUNCTION__);
-    }
 
 }

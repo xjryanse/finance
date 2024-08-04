@@ -9,17 +9,27 @@ use xjryanse\order\service\OrderService;
 use xjryanse\finance\service\FinanceStatementOrderService;
 use xjryanse\finance\service\FinanceManageAccountService;
 use Exception;
+
 /**
  * 分页复用列表
  */
 trait TriggerTraits {
 
+    /**
+     * 
+     * @throws Exception
+     */
     public function extraPreDelete() {
+        // 20231031:验证账单是否能删
+        $this->checkCanDelete();
         // 2022-11-24:先查
         $hasPay = $this->payQuery();
         if ($hasPay) {
             throw new Exception('系统处理中，请稍后查询' . $this->uuid);
         }
+
+        // 20230918:增加
+        $this->payingCheck();
 
         self::checkTransaction();
         $info = $this->get(0);
@@ -41,6 +51,12 @@ trait TriggerTraits {
         
     }
 
+    /**
+     * 
+     * @param type $data
+     * @param type $uuid
+     * @throws Exception
+     */
     public static function extraPreSave(&$data, $uuid) {
         //【关联已有对账单明细】
         if (isset($data['statementOrderIds'])) {
@@ -122,7 +138,6 @@ trait TriggerTraits {
         // 20220609:结算状态是否发生改变：用于extraAfterUpdate进行触发更新
         // 有传参，才判断，没传参，认为未发生改变
         $data['settleChange'] = isset($data['has_settle']) ? Arrays::value($data, 'has_settle') != Arrays::value($info, 'has_settle') : false;
-
     }
 
     /*
@@ -182,6 +197,7 @@ trait TriggerTraits {
             $needPayPrize = 0;
             foreach ($statementOrderIds as $statementOrderId) {
                 $info = FinanceStatementOrderService::getInstance($statementOrderId)->get();
+                // Debug::dump($info);
                 //20220620
                 self::getInstance($uuid)->objAttrsPush('financeStatementOrder', $info);
                 $manageAccountIds[] = $info['manage_account_id'];
@@ -262,26 +278,49 @@ trait TriggerTraits {
 
         //后向关联保存
         $data['pre_statement_id'] = Arrays::value($data, 'pre_statement_id') ?: self::preUniSave($data);
+
+        // 20231113：冗余字段
+        self::redunFields($data, $uuid);
     }
 
+    /**
+     * 
+     * @param type $data
+     * @param type $uuid
+     */
     public static function ramAfterSave(&$data, $uuid) {
         //后向关联保存
-        self::afterUniSave($data);
+        // 20240708：废弃的联动逻辑
+        // self::afterUniSave($data);
     }
-    
+
+    /**
+     * 
+     * @param array $data
+     * @param type $uuid
+     */
     public static function ramPreUpdate(&$data, $uuid) {
         $info = self::getInstance($uuid)->get();
         // 20220609:结算状态是否发生改变：用于extraAfterUpdate进行触发更新
         // 有传参，才判断，没传参，认为未发生改变
         $data['settleChange'] = isset($data['has_settle']) ? Arrays::value($data, 'has_settle') != Arrays::value($info, 'has_settle') : false;
-        self::getInstance($uuid)->preUniUpdate($data);
+        // 20240708:废弃的联动逻辑
+        // self::getInstance($uuid)->preUniUpdate($data);
+
+        // 20231113：冗余字段
+        self::redunFields($data, $uuid);
     }
 
+    /**
+     * 
+     * @param type $data
+     * @param type $uuid
+     */
     public static function ramAfterUpdate(&$data, $uuid) {
+        self::queryCountCheck(__METHOD__,20);        
         Debug::debug(__CLASS__ . __FUNCTION__, $data);
-        //20220609，尝试修复bug（结算不删账单，导致脏数据）；if(isset($data['has_settle']) && $hasSettleRaw != $data['has_settle'] ){
         if ($data['settleChange']) {
-            if ($data['has_settle']) {
+            if (intval($data['has_settle'])) {
                 $accountLogId = Arrays::value($data, 'account_log_id');
                 self::getInstance($uuid)->settleRam($accountLogId);
             } else {
@@ -297,9 +336,6 @@ trait TriggerTraits {
             $upData['has_settle'] = Arrays::value($data, 'has_settle');
         }
         if ($upData) {
-//            $con[] = ['statement_id','=',$uuid ];
-//            //20220320，启动触发模式
-//            $statementOrderIds = FinanceStatementOrderService::mainModel()->where($con)->column('id');
             // 2022-11-20
             $statementOrders = self::getInstance($uuid)->objAttrsList('financeStatementOrder');
             $statementOrderIds = array_column($statementOrders, 'id');
@@ -307,14 +343,21 @@ trait TriggerTraits {
                 FinanceStatementOrderService::getInstance($statementOrderId)->updateRam($upData);
             }
         }
-
-        self::getInstance($uuid)->afterUniUpdate($data);
+        // 20240708：废弃的联动逻辑
+        // self::getInstance($uuid)->afterUniUpdate($data);
     }
 
+    /**
+     * 
+     */
     public function ramPreDelete() {
         self::queryCountCheck(__METHOD__);
+        // 20231031:验证账单是否能删
+        $this->checkCanDelete();
         //有前序关联订单，先删前序
         $info = $this->get();
+        // 20230918:增加
+        $this->payingCheck();
         $preStatementId = $info['pre_statement_id'];
         $tableName = self::mainModel()->getTable();
         if ($preStatementId && !DbOperate::isGlobalDelete($tableName, $preStatementId)) {
@@ -329,6 +372,10 @@ trait TriggerTraits {
         }
     }
 
+    /**
+     * 
+     * @param type $data
+     */
     public function ramAfterDelete($data) {
         //有后序关联订单，再删后序
         $con[] = ['pre_statement_id', '=', $this->uuid];
@@ -340,9 +387,7 @@ trait TriggerTraits {
             }
         }
     }
-    
-    
-    
+
     public static function afterUniSave($data) {
         $orderId = Arrays::value($data, 'order_id');
         $statementCate = Arrays::value($data, 'statement_cate');
@@ -362,8 +407,8 @@ trait TriggerTraits {
         $afterOrderArr = OrderService::getInstance($orderId)->getAfterDataArr('pre_order_id');
 
         foreach ($afterOrderArr as $afterOrderInfo) {
-            $statementOrderIds  = [];
-            $statementOrders    = OrderService::getInstance($afterOrderInfo['id'])->objAttrsList('financeStatementOrder');
+            $statementOrderIds = [];
+            $statementOrders = OrderService::getInstance($afterOrderInfo['id'])->objAttrsList('financeStatementOrder');
             foreach ($statementOrders as $statementOrder) {
                 if (!Arrays::value($statementOrder, 'has_statement')) {
                     $statementOrderIds[] = $statementOrder['id'];
@@ -371,19 +416,16 @@ trait TriggerTraits {
             }
             if ($statementOrderIds) {
                 $savData = [];
-                $savData['statementOrderIds']   = $statementOrderIds;
-                $savData['has_confirm']         = 1;
+                $savData['statementOrderIds'] = $statementOrderIds;
+                $savData['has_confirm'] = 1;
                 //20220620:处理方向：向前
-                $savData[DIRECTION]             = DIRECT_AFT;
-                $savData['pre_statement_id']    = $data['id'];
+                $savData[DIRECTION] = DIRECT_AFT;
+                $savData['pre_statement_id'] = $data['id'];
                 self::saveRam($savData);
             }
         }
         return true;
-        /*         * ********************** */
     }
-
-    
 
     /**
      * 前序关联删除
@@ -398,8 +440,8 @@ trait TriggerTraits {
     public function afterUniDelete() {
         
     }
-    
-        /**
+
+    /**
      * 20220620
      * @param type $data
      */
@@ -460,7 +502,7 @@ trait TriggerTraits {
         $resData = self::saveRam($data);
         return $resData ? $resData['id'] : "";
     }
-    
+
     /**
      * 20220620
      * @param type $data
@@ -481,5 +523,40 @@ trait TriggerTraits {
             $updData[DIRECTION] = DIRECT_PRE;
             return self::getInstance($preInfo['id'])->updateRam($updData);
         }
+    }
+
+    /**
+     * 20230918:校验支付中，不让删
+     */
+    public function payingCheck() {
+        $info = $this->get();
+        if ($info['has_front_pay'] && !$info['has_settle']) {
+            throw new Exception('系统处理中，请稍后重试');
+        }
+    }
+
+    /**
+     * 验证账单是否能删
+     */
+    protected function checkCanDelete() {
+        $info = $this->get();
+        $toPayer = Arrays::value($info, 'to_payer');
+        if ($toPayer) {
+            throw new Exception('账单已发付款方，不可删除');
+        }
+    }
+
+    /**
+     * 20231113：冗余数据
+     * @param type $data
+     * @param type $uuid
+     * @return type
+     */
+    protected static function redunFields(&$data, $uuid) {
+        // $lists = self::getInstance($uuid)->objAttrsList('financeStatementOrder');
+        // dump($lists);
+        $data['statement_type'] = FinanceStatementOrderService::calStatementTypeByStatementId($uuid);
+
+        return $data;
     }
 }

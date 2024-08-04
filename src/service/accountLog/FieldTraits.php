@@ -110,7 +110,10 @@ trait FieldTraits{
     public function fUserId() {
         return $this->getFFieldValue(__FUNCTION__);
     }
-
+    
+    public function fStatementId() {
+        return $this->getFFieldValue(__FUNCTION__);
+    }
     /**
      * 排序
      */

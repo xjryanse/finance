@@ -13,6 +13,7 @@ use xjryanse\customer\service\CustomerUserService;
 use xjryanse\finance\service\FinanceStatementOrderService;
 use xjryanse\finance\service\FinanceAccountLogService;
 use xjryanse\finance\service\FinanceManageAccountLogService;
+use xjryanse\finance\service\FinanceManageAccountService;
 use xjryanse\finance\logic\UserPayLogic;
 use xjryanse\wechat\service\WechatWxPayConfigService;
 use xjryanse\wechat\service\WechatWxPayLogService;
@@ -28,7 +29,12 @@ class FinanceStatementService {
 
     use \xjryanse\traits\InstTrait;
     use \xjryanse\traits\MainModelTrait;
+    use \xjryanse\traits\MainModelRamTrait;
+    use \xjryanse\traits\MainModelCacheTrait;
+    use \xjryanse\traits\MainModelCheckTrait;
+    use \xjryanse\traits\MainModelGroupTrait;
     use \xjryanse\traits\MainModelQueryTrait;
+
     use \xjryanse\traits\ObjectAttrTrait;
 
     protected static $mainModel;
@@ -59,6 +65,9 @@ class FinanceStatementService {
 
     use \xjryanse\finance\service\statement\TriggerTraits;
     use \xjryanse\finance\service\statement\FieldTraits;
+    use \xjryanse\finance\service\statement\CalTraits;
+    use \xjryanse\finance\service\statement\DoTraits;
+    use \xjryanse\finance\service\statement\PaginateTraits;
     
     /**
      * 获取账单未结清的金额
@@ -128,6 +137,8 @@ class FinanceStatementService {
         Debug::debug(__CLASS__ . __FUNCTION__ . '的$con', $con);
         Debug::debug(__CLASS__ . __FUNCTION__ . '的$lists', $lists);
         foreach ($lists as $k => $v) {
+            // 20231031
+            self::getInstance($v['id'])->checkCanDelete();
             //设为未对账
             self::getInstance($v['id'])->update(['has_confirm' => 0]);
             //然后才能删
@@ -155,6 +166,8 @@ class FinanceStatementService {
         $con[] = ['has_settle', '=', 0];      //未结算
         $lists = self::mainModel()->where($con)->select();
         foreach ($lists as $k => $v) {
+            // 20231031
+            self::getInstance($v['id'])->checkCanDelete();
             //设为未对账
             self::getInstance($v['id'])->updateRam(['has_confirm' => 0]);
             //然后才能删
@@ -193,23 +206,15 @@ class FinanceStatementService {
      * @param type $statementOrderIds   账单订单表的id
      * @return type
      */
-    public static function statementGenerateRam($statementOrderIds = []) {
+    public static function statementGenerateRam($statementOrderIds = [],$data = []) {
         //self::checkNoTransaction();
         //字符串数组都可以传
         $data['statementOrderIds'] = $statementOrderIds 
                 ? (is_array($statementOrderIds) ? $statementOrderIds : [$statementOrderIds]) 
                 : [];
         $data['has_confirm'] = 1;    //默认已确认
-//        $orderIds = FinanceStatementOrderService::column('distinct order_id', [['id', 'in', $statementOrderIds]]);
-//        $source = OrderService::mainModel()->where([['id', 'in', $orderIds]])->column('distinct source');
-//        if (in_array('admin', $source)) {
-//            $data['group'] = 'offline'; //线下
-//        } else {
-//            $data['group'] = 'online';  //线上
-//        }
-//        Db::startTrans();
+
         $res = FinanceStatementService::saveRam($data);
-//        Db::commit();
 
         return $res;
     }
@@ -521,7 +526,17 @@ class FinanceStatementService {
     /**
      * 取消对冲结算逻辑
      */
-    protected function cancelSettleRam() {
+    protected function cancelSettleRam($multiCheck = true) {
+        $info = $this->get();
+        // 20240121:非待结状态，直接返回
+        if(!$info['has_settle']){
+            // 20240122:有问题了
+            // return true;
+        }
+        if($info['account_log_id'] && $multiCheck && self::calAccountLogStatementCount($info['account_log_id']) > 1){
+            throw new Exception('流水对应了多笔账单，不支持单笔操作，确需操作请先删除账户流水，注意可能影响其他单据');
+        }
+        
         $con[] = ['from_table', '=', self::mainModel()->getTable()];
         $con[] = ['from_table_id', '=', $this->uuid];
         $lists = FinanceManageAccountLogService::lists($con);
@@ -531,13 +546,16 @@ class FinanceStatementService {
         }
         //步骤2：
         //$res = self::mainModel()->where('id',$this->uuid)->update(['has_settle'=>0,"account_log_id"=>""]);   //更新为未结算
+        // 20240122:调整为do
         $res = $this->updateRam(['has_settle' => 0, "account_log_id" => "", "account_bill_time" => null]);
         //20220516：调整，以触发触发器，TODO解决性能问题 20220617，似乎可以取消？？？
+        /*
         $cone[] = ['statement_id', '=', $this->uuid];
         $listsOrder = FinanceStatementOrderService::lists($cone);
         foreach ($listsOrder as $v) {
             FinanceStatementOrderService::getInstance($v['id'])->updateRam(['has_settle' => 0]);   //更新为未结算
         }
+         */
         //20220516注释
         //FinanceStatementOrderService::mainModel()->where('statement_id',$this->uuid)->update(['has_settle'=>0]);   //更新为未结算
         //步骤3：【关联删入账】20210319关联删入账
@@ -545,7 +563,8 @@ class FinanceStatementService {
         $listsAccountLog = FinanceAccountLogService::lists($con2);
         foreach ($listsAccountLog as $v) {
             //一个个删，可能关联其他的删除
-            FinanceAccountLogService::getInstance($v['id'])->deleteRam();
+            // 20240122:改成do方法？
+            FinanceAccountLogService::getInstance($v['id'])->doDeleteRam();
         }
         return $res;
     }
@@ -651,7 +670,15 @@ class FinanceStatementService {
         }
         //原付款单的支付记录
         // payBy的值：FR_FINANCE_WECHAT；FR_FINANCE_MONEY；FR_FINANCE_CMBSKT；FR_FINANCE_WXWORK；
-        $res = UserPayLogic::ref($this->uuid, $payBy);
+        $rawAccountLogId        = $rawStatementInfo['account_log_id'];
+        $rawAccLogFromTableId   = FinanceAccountLogService::getInstance($rawAccountLogId)->fFromTableId();
+        
+        $info = WechatWxPayLogService::getInstance($rawAccLogFromTableId)->get();
+        
+        $thirdParam['wePubAppId']   = $info['appid'];
+        $thirdParam['openid']       = $info['openid'];
+        
+        $res = UserPayLogic::ref($this->uuid, $payBy, $thirdParam);
         dump('退款结果');
         dump($res);
     }
@@ -764,7 +791,7 @@ class FinanceStatementService {
         // 只提取管理员
         $customerIds    = CustomerUserService::userManageCustomerIds(session(SESSION_USER_ID));
         $con[]          = ['customer_id', 'in', $customerIds];
-        $lists = self::paginateRaw($con);
+        $lists = self::paginateRaw($con,'create_time desc');
         return $lists;
     }
     /**
@@ -790,5 +817,58 @@ class FinanceStatementService {
         }
         $data['need_pay_prize'] = $needPayPrize;
         return $this->doUpdateRamClearCache($data);
+    }
+    /**
+     * 强制删除(不需要confirm)
+     */
+    public function strictDelRam(){
+        $info = $this->get();
+        if($info['has_settle']){
+            throw new Exception('已结账单不可删除'.$this->uuid);
+        }
+        // 【1】取消确认
+        $data['has_confirm'] = 0;
+        $this->updateRam($data);
+        // 【2】删除
+        return $this->deleteRam();
+    }
+    
+    /**
+     * 单据打包
+     * 用于收付款流水登记
+     * @param type $ids
+     * @return int
+     * @throws Exception
+     */
+    protected static function packPreGetForAccountLog($ids) {
+        if(!$ids){
+            return [];
+        }
+        $con[]      = ['id', 'in', $ids];
+        $lists      = self::where($con)->select();
+        $listsArr   = $lists ? $lists->toArray() : [];
+        $manageAccountIds    = Arrays2d::uniqueColumn($listsArr, 'manage_account_id');
+        if(count($manageAccountIds) >1){
+            throw new Exception('请选择同一往来单位/用户的单据');
+        }
+        $customerIds        = Arrays2d::uniqueColumn($listsArr, 'customer_id');
+        // 可能多个，无伤大雅
+        $userIds            = Arrays2d::uniqueColumn($listsArr, 'user_id');
+        
+        // $manageAccountId    = $manageAccountIds[0];
+        // $mAcInfo = FinanceManageAccountService::getInstance($manageAccountId)->get();
+        
+        $money                  = self::where($con)->sum('need_pay_prize');
+        // $data['user_id']    = $userIds[0];
+        $data['customer_id']    = $customerIds[0];
+        $data['user_id']        = $userIds[0];
+        $data['number']         = count($listsArr);
+        $data['money']          = $money;
+        // 1进账；2出账
+        $data['change_type']    = $money > 0 ? '1': '2';
+        $data['statementIds']   = $ids;
+        $data['status']         = 1;
+
+        return $data;
     }
 }

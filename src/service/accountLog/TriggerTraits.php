@@ -10,7 +10,6 @@ use xjryanse\customer\service\CustomerService;
 use xjryanse\finance\service\FinanceStatementService;
 use xjryanse\finance\service\FinanceStatementOrderService;
 use xjryanse\finance\service\FinanceAccountService;
-use xjryanse\finance\service\FinanceAccountLogService;
 use xjryanse\finance\service\FinanceManageAccountService;
 use xjryanse\finance\service\FinanceManageAccountLogService;
 use xjryanse\logic\Debug;
@@ -75,8 +74,9 @@ trait TriggerTraits{
         return $data;
     }
     
-        /**
+    /**
      * 额外输入信息
+     * 准备弃用
      */
     public static function extraAfterSave(&$data, $uuid) {
         $customerId = Arrays::value($data, 'customer_id');  //不一定有
@@ -170,6 +170,12 @@ trait TriggerTraits{
         if (!Arrays::value($data, 'user_id') && !Arrays::value($data, 'customer_id')) {
             throw new Exception('customer_id和user_id需至少有一个参数有值');
         }
+        // 20240420
+        $money = Arrays::value($data, 'money');
+        if(!intval($money * 100) && !FinanceAccountService::getInstance($data['account_id'])->fCanZero()){
+            $accountInfo = FinanceAccountService::getInstance($data['account_id'])->get();
+            throw new Exception($accountInfo['account_name'].'不可0金额入账');
+        }
 
         $fromTable = Arrays::value($data, 'from_table');
         $fromTableId = Arrays::value($data, 'from_table_id');
@@ -184,7 +190,27 @@ trait TriggerTraits{
         }
 
         $data['pre_log_id'] = Arrays::value($data, 'pre_log_id') ?: self::preUniSave($data);
+        // 20231116
+        $data['bill_time'] = Arrays::value($data, 'bill_time') ?: date('Y-m-d H:i:s');
+        
+        $statementIds = Arrays::value($data, 'statementIds') ? : [];
+        if($statementId){
+            $statementIds = array_unique(array_merge($statementIds,[$statementId]));
+        }
+        $data['bill_type'] = FinanceStatementService::calStatementTypeByIds($statementIds);
 
+        self::redunFields($data, $uuid);
+        return $data;
+    }
+
+    /**
+     * 20240302：更新前写入
+     * @param type $data
+     * @param type $uuid
+     */
+    public static function ramPreUpdate(&$data, $uuid) {
+
+        self::redunFields($data, $uuid);
         return $data;
     }
 
@@ -198,9 +224,17 @@ trait TriggerTraits{
         $fromTable = Arrays::value($data, 'from_table');
         $fromTableId = Arrays::value($data, 'from_table_id');
         $statementId = Arrays::value($data, 'statement_id'); //对账单id
-
-        if ($statementId && FinanceStatementService::getInstance($statementId)->fHasSettle()) {
-            throw new Exception('账单' . $statementId . '已结算');
+        
+        // 20231116
+        //对账单,多笔id
+        $statementIds = Arrays::value($data, 'statementIds') ? : [];
+        if($statementId){
+            $statementIds = array_unique(array_merge($statementIds,[$statementId]));
+        }
+        foreach($statementIds as $stId){
+            if ($statementId && FinanceStatementService::getInstance($stId)->fHasSettle()) {
+                throw new Exception('账单' . $statementId . '已结算');
+            }
         }
 
         if ($fromTable) {
@@ -211,22 +245,14 @@ trait TriggerTraits{
         }
         FinanceAccountService::getInstance($accountId)->updateRemainMoneyRam();
 
-        //更新账户余额: 20220620TODObug??
-        /*
-          FinanceAccountService::getInstance( $accountId )->updateRemainMoney();
-          //更新客户挂账 ???可否取消？？20220617
-          if(FinanceAccountService::getInstance($accountId)->fAccountType() == 'customer'){
-          $customerMoney = self::customerMoneyCalc($customerId, $accountId);
-          CustomerService::mainModel()->where('id',$customerId)->update(['pre_pay_money'=>$customerMoney]);
-          }
-         */
-
         //最新：更新客户的挂账款流水金额
-        if ($customerId) {
-            $manageAccountId = FinanceManageAccountService::customerManageAccountId($customerId);
-        } else {
-            $manageAccountId = FinanceManageAccountService::userManageAccountId($userId);
-        }
+//        if ($customerId) {
+//            $manageAccountId = FinanceManageAccountService::customerManageAccountId($customerId);
+//        } else {
+//            $manageAccountId = FinanceManageAccountService::userManageAccountId($userId);
+//        }
+        $manageAccountId = FinanceManageAccountService::manageAccountId($customerId, $userId);
+        
         $data2 = Arrays::getByKeys($data, ['money', 'user_id', 'account_id', 'change_type', 'reason']);
         $data2['manage_account_id'] = $manageAccountId;
         $data2['from_table'] = self::mainModel()->getTable();
@@ -234,24 +260,40 @@ trait TriggerTraits{
         FinanceManageAccountLogService::saveRam($data2);
 
         //【对账单id】（如有关联对账单id，进行对冲结算）
-        if ($statementId) {
-            FinanceStatementService::getInstance($statementId)->updateRam(['has_settle' => 1, "account_log_id" => $uuid]);
-        }
+//        if ($statementId) {
+//            FinanceStatementService::getInstance($statementId)->updateRam(['has_settle' => 1, "account_log_id" => $uuid]);
+//        }
+        self::getInstance($uuid)->statementsSettleRam($statementIds);
 
         self::afterUniSave($data);
+        // 20240117:手续费率
+        $charge = Arrays::value($data, 'charge');
+        
+        FinanceStatementOrderService::chargeDistribute($charge, $statementIds, $data);
     }
     // 20230818:更新账户余额
     public static function ramAfterUpdate(&$data, $uuid) {
         $info = self::getInstance($uuid)->get();
         FinanceAccountService::getInstance($info['account_id'])->updateRemainMoneyRam();
     }
-    
 
     /**
      * 删除
      */
     public function ramPreDelete() {
         $info = $this->get();
+        //来源表有记录，则报错
+        if ($info['from_table'] && $info['from_table_id']) {
+            $conc = [['from_table','=',$info['from_table']],['from_table_id','=',$info['from_table_id']]];
+            $count = self::where($conc)->count();
+            // 20240727:如果不止一条，可能是程序写错了，后期核查需要删除
+            if ($count == 1 && Db::table($info['from_table'])->where('id', $info['from_table_id'])->find()) {
+                throw new Exception('请先删除' . $info['from_table'] . '表,id为' . $info['from_table_id'] . '的记录');
+            }
+        }
+        // 20231116:账单取消结算
+        $this->statementsCancelSettleRam();
+        
         FinanceAccountService::getInstance($info['account_id'])->updateRemainMoneyRam();
     }
 
@@ -317,5 +359,46 @@ trait TriggerTraits{
         }
 
         return true;
+    }
+    /**
+     * 20231116：账单结算(多单)
+     */
+    public function statementsSettleRam($statementIds){
+        $upData                     = [];
+        $upData['has_settle']       = 1;
+        $upData['account_log_id']   = $this->uuid;
+
+        foreach($statementIds as $statementId){
+            FinanceStatementService::getInstance($statementId)->updateRam($upData);
+        }
+    }
+    /**
+     * 账单取消结算
+     */
+    public function statementsCancelSettleRam(){
+        $con = [];
+        $con[] = ['account_log_id','=',$this->uuid];
+        $ids = FinanceStatementService::where($con)->column('id');
+        foreach($ids as $id){
+            // 不校验多笔账单
+            FinanceStatementService::getInstance($id)->cancelSettleRam(false);
+        }
+    }
+    /**
+     * 20240302
+     * 冗余字段
+     * @param type $data
+     * @param type $uuid
+     */
+    protected static function redunFields(&$data, $uuid){
+        // statement_id，取orders
+        // 20240420
+        if(isset($data['statement_id'])){
+            $statementId =  Arrays::value($data, 'statement_id');
+            $data['order_type'] = $statementId 
+                    ? FinanceStatementService::getInstance($statementId)->calStatementOrderType() 
+                    : '';
+        }
+        return $data;
     }
 }

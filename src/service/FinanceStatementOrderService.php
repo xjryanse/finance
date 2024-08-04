@@ -21,7 +21,12 @@ class FinanceStatementOrderService {
 
     use \xjryanse\traits\InstTrait;
     use \xjryanse\traits\MainModelTrait;
+    use \xjryanse\traits\MainModelRamTrait;
+    use \xjryanse\traits\MainModelCacheTrait;
+    use \xjryanse\traits\MainModelCheckTrait;
+    use \xjryanse\traits\MainModelGroupTrait;
     use \xjryanse\traits\MainModelQueryTrait;
+
     use \xjryanse\traits\ObjectAttrTrait;
 
     protected static $mainModel;
@@ -37,8 +42,8 @@ class FinanceStatementOrderService {
     use \xjryanse\finance\service\statementOrder\FieldTraits;
     use \xjryanse\finance\service\statementOrder\TriggerTraits;
     use \xjryanse\finance\service\statementOrder\CalTraits;
+    use \xjryanse\finance\service\statementOrder\DoTraits;
 
-    
     /**
      * 取消支付后删除对应的账单。
      * TODO建议调用一下查单接口
@@ -115,11 +120,12 @@ class FinanceStatementOrderService {
      * 一般用于订单取消，撤销全部的订单
      * ！！【未测】20210402
      */
-    public static function clearOrderNoDeal($orderId, $cate = '') {
+    public static function clearOrderNoDeal($orderId, $cate = '') {        
         Debug::debug(__CLASS__ . __FUNCTION__, $orderId);
         self::checkTransaction();
         if (!$orderId) {
-            throw new Exception('订单id必须');
+            return false;
+            // throw new Exception('订单id必须');
         }
         $con[] = ['order_id', '=', $orderId];
         $con[] = ['has_statement', '=', 0];   //未出账单
@@ -152,6 +158,10 @@ class FinanceStatementOrderService {
         $con[] = ['order_id', '=', $orderId];
         $con[] = ['has_statement', '=', 0];   //未出账单
         $con[] = ['has_settle', '=', 0];      //未结算
+        // 20240121：增加条件：来源表判断，避免误杀包车趟次录入的价格数据
+        $orderTable     = OrderService::getTable();
+        $con[]          = ['belong_table', '=', $orderTable];      //未结算
+        // 
         // 20220615：账单类型
         if ($cate) {
             $con[] = ['statement_cate', '=', $cate];      //账单类型过滤
@@ -314,7 +324,8 @@ class FinanceStatementOrderService {
         //20220615增加；
         OrderService::getInstance($orderId)->setUuData(['order_prize' => $money]);
         $statementOrdersArr = OrderService::getInstance($orderId)->objAttrsList('financeStatementOrder');
-        $con1[] = ['has_statement', '=', 1];
+        // 20240121:改取全部的账单明细，这样才总金额才不会超
+        // $con1[] = ['has_statement', '=', 1];
         // 20220608，开发向供应商付款的逻辑。增加buyer条件
         $con1[] = ['statement_cate', '=', $statementCate];
         $hasSettleMoney = array_sum(array_column(Arrays2d::listFilter($statementOrdersArr, $con1), 'need_pay_prize'));
@@ -323,16 +334,24 @@ class FinanceStatementOrderService {
         //$onRoadMoney = self::onRoadSavePrize($orderId, $statementCate);
         //剩余应付金额
         $remainNeedPayMoney = $money - $hasSettleMoney; // - $onRoadMoney;
-
+        // 20231030：增加一些关联的字段
+        $saveData                   = [];
+        $saveData['original_prize'] = $remainNeedPayMoney;
+        $saveData['discount_prize'] = 0;
+        // $saveData['is_needpay']     = 1;
+        // dump('$statementOrdersArr');
+        // dump($money);
+        // dump($statementOrdersArr);
+        // dump($remainNeedPayMoney);
         if ($remainNeedPayMoney > 0) {
             //如为应收；
             $prizeKey = "GoodsPrize";
             // 应收
-            self::prizeKeySaveRam($prizeKey, $orderId, $remainNeedPayMoney);
+            self::prizeKeySaveRam($prizeKey, $orderId, $remainNeedPayMoney, $saveData);
         } else if ($remainNeedPayMoney < 0) {
             // 应退
             $prizeKey = "normalRef";
-            self::prizeKeySaveRam($prizeKey, $orderId, $remainNeedPayMoney);
+            self::prizeKeySaveRam($prizeKey, $orderId, $remainNeedPayMoney, $saveData);
         }
 
         return $remainNeedPayMoney;
@@ -483,6 +502,14 @@ class FinanceStatementOrderService {
      * 对账单商品id
      */
     public static function statementOrderGoodsName($ids) {
+        foreach($ids as $k=>$id){
+            if(!$id){
+                unset($ids[$k]);
+            }
+        }
+        if(!$ids){
+            return '';
+        }
         $con[] = ['id', 'in', $ids];
         return self::conGoodsName($con);
     }
@@ -565,6 +592,30 @@ class FinanceStatementOrderService {
     }
 
     /**
+     * 20240419：准备替代上述方法
+     * @param type $prizeKey
+     * @param type $prize
+     * @param type $data
+     * @return type
+     */
+    public static function prizeGetIdForSettle($prizeKey, $prize, $data = []){
+        $keys   = ['order_id','sub_id','belong_table','belong_table_id','is_un_prize'];
+        $dataS  = Arrays::getByKeys($data, $keys);
+        $dataS['statement_type']    = $prizeKey;
+        // 未交款
+        $dataS['has_confirm']       = 0;
+        // 未结算
+        $dataS['has_settle']        = 0;
+        $id                         = self::commGetIdEG($dataS);
+        // Debug::dump($id);
+        //应付金额拿来更新
+        $dataUpd['need_pay_prize']  = $prize;
+        self::getInstance($id)->updateRam($dataUpd);
+
+        return self::getInstance($id)->get();
+    }
+
+    /**
      * 20230726
      * 跳过订单逻辑，直接用来源表写入订单，更加灵活
      * @param type $prizeKey
@@ -576,13 +627,13 @@ class FinanceStatementOrderService {
     public static function belongTablePrizeKeySaveRam($prizeKey,$prize,$belongTable,$belongTableId,$data = []){
         // 有价格才写入
         if (!$prize || !$prizeKey) {
-            return false;
+            // 20240523:发现有部分难以清点的金额，客户会以0入账
+            // return false;
         }
         $data['statement_type'] = $prizeKey;
         $data['need_pay_prize'] = $prize;
         $data['belong_table']   = $belongTable;
         $data['belong_table_id']   = $belongTableId;
-        
         $goodsPrizeInfo = GoodsPrizeKeyService::getByPrizeKey($prizeKey);  //价格key取归属
         //key不可重复添加时，判断有key不执行
         if (Arrays::value($goodsPrizeInfo, 'is_duplicate')) {
@@ -600,6 +651,7 @@ class FinanceStatementOrderService {
         $data['statement_type'] = $prizeKey;
         //增加是否退款的判断
         $data['is_ref'] = Arrays::value($goodsPrizeInfo, 'type') == 'ref' ? 1 : 0;
+
         return self::saveRam($data);
     }
     
@@ -687,7 +739,38 @@ class FinanceStatementOrderService {
      */
     public static function belongTableStatementOrderIds($belongTable, $belongTableId, $con = []){
         $con[] = ['belong_table', '=', $belongTable];
-        $con[] = ['belong_table_id', '=', $belongTableId];
+        $con[] = ['belong_table_id', 'in', $belongTableId];
+        return self::ids($con);
+    }
+    /**
+     * 源表提取明细
+     * @param type $belongTable
+     * @param type $belongTableId
+     * @param type $con
+     * @return type
+     */
+    public static function belongTableStatementOrders($belongTable, $belongTableId, $con = []){
+        $con[] = ['belong_table', '=', $belongTable];
+        $con[] = ['belong_table_id', 'in', $belongTableId];
+        return self::where($con)->select();
+    }
+    /**
+     * 源表的已结算金额
+     * @param type $belongTable
+     * @param type $belongTableId
+     * @param type $con
+     * @return type
+     */
+    public static function belongTableSettleMoney($belongTable, $belongTableId, $con = []){
+        $con[] = ['belong_table', '=', $belongTable];
+        $con[] = ['belong_table_id', 'in', $belongTableId];
+        $con[] = ['has_settle', 'in', 1];
+        return self::where($con)->sum('need_pay_prize');
+    }
+    
+    //20231231:报销跨表
+    public static function belongTableIdStatementOrderIds($belongTableId, $con = []){
+        $con[] = ['belong_table_id', 'in', $belongTableId];
         return self::ids($con);
     }
     
@@ -698,12 +781,19 @@ class FinanceStatementOrderService {
      * @return type
      */
     public static function belongTableHasStatementOrder($belongTable, $belongTableId, $prizeKeys, $subId = '') {
+        // 20231228:增加去除内存已删未提交的id
+        $thisTable  = self::getTable();
+        $deletedIds = DbOperate::tableGlobalDeleteIds($thisTable);
+        if($deletedIds){
+            $con[] = ['id','not in',$deletedIds];
+        }
+
         $con[] = ['statement_type', '=', $prizeKeys];
         //20220803:增加子id
         if ($subId) {
             $con[] = ['sub_id', '=', $subId];
         }
-        $ids = self::belongTableStatementOrderIds($belongTable, $belongTableId);
+        $ids = self::belongTableStatementOrderIds($belongTable, $belongTableId, $con);
 
         return count($ids);
     }
@@ -887,18 +977,24 @@ class FinanceStatementOrderService {
      * @return type
      * @throws Exception
      */
-    public static function getStatementIdWithGenerateRam($statementOrderIds, $reGenerate = false) {
+    public static function getStatementIdWithGenerateRam($statementOrderIds, $reGenerate = false, $data = []) {
         if (!is_array($statementOrderIds)) {
             $statementOrderIds = [$statementOrderIds];
         }
         
-        // 20230903：移到外面试试，避免一直循环
+        // 【1】处理微信支付账单，避免清理到已付款未结算的账单。
         WechatWxPayLogService::dealBatch();
+        // 原来的已有账单，有直接返回
+        $statementIdRaw = self::getStatementIdRaw($statementOrderIds);
+        if($statementIdRaw){
+            return $statementIdRaw;
+        }
+        
+        // 【2】账单取消支付
         $con[] = ['id', 'in', $statementOrderIds];
         $statementOrderInfos = self::listSetUudata($con, MASTER_DATA);
         Debug::debug('getStatementIdWithGenerate调试打印', $statementOrderInfos);
         //20220301:微信支付尝试批量处理,批量请求有bug20220302
-
         $statementIds = [];
         // 多个账单循环取消
         foreach ($statementOrderIds as $statementOrderId) {
@@ -936,9 +1032,10 @@ class FinanceStatementOrderService {
         $statementId = $uniqIds ? array_pop($uniqIds) : '';
         if (!$statementId) {
             //重新生成账单
-            $financeStatement = FinanceStatementService::statementGenerateRam($statementOrderIds);
-            $statementId = $financeStatement['id'];
+            $financeStatement   = FinanceStatementService::statementGenerateRam($statementOrderIds, $data);
+            $statementId        = $financeStatement['id'];
         }
+
         return $statementId;
     }
 
@@ -961,7 +1058,8 @@ class FinanceStatementOrderService {
         if (Arrays::value($info, 'statement_id')) {
             throw new Exception($this->uuid . '已经对应了对账单' . Arrays::value($info, 'statement_id'));
         }
-        return $this->updateRam(['statement_id' => $statementId, "has_statement" => 1]);
+        // 20240708:增加has_confirm
+        return $this->updateRam(['statement_id' => $statementId, "has_statement" => 1,'has_confirm'=>1]);
     }
 
     /**
@@ -976,8 +1074,11 @@ class FinanceStatementOrderService {
             throw new Exception($this->uuid . '已经结算过了');
         }
         if (Arrays::value($info, 'has_confirm')) {
-            throw new Exception($this->uuid . '客户已经确认过了');
+            // throw new Exception($this->uuid . '客户已经确认过了');
         }
+        //20230918:系统处理中判断：
+        FinanceStatementService::getInstance($info['statement_id'])->payingCheck();
+
         return $this->update(['statement_id' => "", "has_statement" => 0]);
     }
 
@@ -987,7 +1088,7 @@ class FinanceStatementOrderService {
             throw new Exception($this->uuid . '已经结算过了');
         }
         if (Arrays::value($info, 'has_confirm')) {
-            throw new Exception($this->uuid . '客户已经确认过了');
+            // throw new Exception($this->uuid . '客户已经确认过了');
         }
         return $this->updateRam(['statement_id' => "", "has_statement" => 0]);
     }
@@ -1037,18 +1138,6 @@ class FinanceStatementOrderService {
 
         return $dataArr;
     }
-
-//    /*
-//     * 订单是否已对账
-//     * TODO 优化 一笔订单在一个客户下只对账一次。
-//     */
-//    public static function hasStatement( $customerId, $orderId )
-//    {
-//        $con[] = ['customer_id','=',$customerId];
-//        $con[] = ['order_id','=',$orderId];
-//        return self::mainModel()->where( $con )->value('id');
-//    }
-
     
     /**
      * 20230807:改价格
@@ -1094,8 +1183,9 @@ class FinanceStatementOrderService {
                 }
             }
         }
-
+        // 20240523：有0金额入账的情况，金额难以清点
         if($prize > 0){
+            Debug::dump('测试0金额入账');
             self::belongTablePrizeKeySaveRam($prizeKey, $prize, $belongTable, $belongTableId, $data);
         }
         if($prize < 0){
@@ -1120,8 +1210,9 @@ class FinanceStatementOrderService {
      * 20230903
      * 重新架构
      */
-    public static function statementGenerateRam($ids){
-        $statementId        = self::getStatementIdWithGenerateRam($ids, true);
+    public static function statementGenerateRam($ids, $data = []){
+        // 获取账单id，无记录时生成账单
+        $statementId        = self::getStatementIdWithGenerateRam($ids, true, $data);
         $financeStatement   = FinanceStatementService::getInstance( $statementId )->info();
         return $financeStatement;
     }
@@ -1155,4 +1246,71 @@ class FinanceStatementOrderService {
         // 执行账单逻辑的退款动作
         return FinanceStatementService::getInstance($statementId)->doRefRevert();
     }
+    /**
+     * 获取原有的账单(明细一样不重新生成账单)
+     * @return string
+     */
+    public static function getStatementIdRaw($statementOrderIds){
+        $con    = [];
+        $con[]  = ['id','in',$statementOrderIds];
+
+        $statementIds = self::where($con)->column('distinct statement_id');
+        if(count($statementIds) != 1 || !$statementIds[0] ){
+            return '';
+        }
+        
+        $cone    = [];
+        $cone[]  = ['statement_id','in',$statementIds];
+
+        $stCount = self::where($con)->count();
+        if($stCount != count($statementOrderIds)){
+            return '';
+        }
+        
+        return $statementIds[0];
+    }
+    /**
+     * 20231123
+     * 查询subId是否有已结算记录，一般用于删除校验
+     * @param type $subId
+     */
+    public static function subIdHasSettleRecord($subId){
+        $con    = [];
+        $con[]  = ['sub_id','=',$subId];
+        $con[]  = ['has_settle','=',1];
+        return self::where($con)->count();
+    }
+    /**
+     * 20240117：手续费分配
+     */
+    public static function chargeDistribute($charge,$statementIds, $data=[]){
+        $arr = [];
+        foreach($statementIds as $stId){
+            $tArr = FinanceStatementService::getInstance($stId)->objAttrsList('financeStatementOrder');
+            $arr = array_merge($arr, $tArr);
+        }
+        
+        $sum = Arrays2d::sum($arr, 'need_pay_prize');
+        // 费率
+        $rate = $sum && $charge ? $charge / $sum : 0;
+        if(!$rate){
+            return false;
+        }
+        $allFee = 0;
+        foreach($arr as $k=>&$v){
+            
+            if($k + 1 < count($arr)){
+                $tmpCharge = intval($rate * $v['need_pay_prize'] * 100) / 100;
+                $allFee += $tmpCharge;
+            } else {
+                // 最后一个用分摊，解决尾数差异问题
+                $tmpCharge = $charge - $allFee;
+            }
+
+            self::getInstance($v['id'])->doUpdateRam(['charge'=>$tmpCharge]);
+        }
+
+
+    }
+    
 }

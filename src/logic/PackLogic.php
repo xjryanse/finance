@@ -60,16 +60,26 @@ class PackLogic
      * @param type $statementOrderId    对账单id，用于关联获取客户信息（付款存在多客户情况）
      * @return type
      */
-    public static function financeDealRam($orderId,$accountId,$money, $stOrData=[], $prizeKey='' ,$statementOrderId='', $data = []){
+    public static function financeDealRam($orderId,$accountId,$money, $stOrData=[], $prizeKey='' ,$statementOrderId='', $data = [], $accountData=[]){
         // dump(func_get_args());
         //20220622,增加原始账单获取
+        // $statementId = FinanceStatementOrderService::mainModel()->newId();
+        
         $statementOrderInfo = $statementOrderId ? FinanceStatementOrderService::getInstance($statementOrderId)->get() : [];
         if(!$statementOrderInfo || $statementOrderInfo['need_pay_prize'] != $money){
             //步骤①创建一笔收款明细
-            $stOrData['customer_id'] = Arrays::value($statementOrderInfo, 'customer_id');
-            $stOrData['user_id'] = Arrays::value($statementOrderInfo, 'user_id');
-            $statementOrderInfo = FinanceStatementOrderService::prizeKeySaveRam($prizeKey, $orderId, $money,$stOrData);
+            $stOrData['customer_id']    = Arrays::value($statementOrderInfo, 'customer_id');
+            $stOrData['user_id']        = Arrays::value($statementOrderInfo, 'user_id');
+            $stOrData['order_id']       = $orderId;
+            // 20240725
+            $stOrData['has_confirm']    = 1;
+            $stOrData['has_statement']  = 1;
+            // $stOrData['statement_id']   = $statementId;
+            // $statementOrderInfo = FinanceStatementOrderService::prizeKeySaveRam($prizeKey, $orderId, $money,$stOrData);
+            // 20240121：替换？
+            $statementOrderInfo = FinanceStatementOrderService::prizeGetIdForSettle($prizeKey, $money, $stOrData);
         }
+        Debug::dump($statementOrderInfo);
         //步骤②生成账单
         $data['statementOrderIds']  = [$statementOrderInfo['id']];
         $data['has_confirm']        = 1;
