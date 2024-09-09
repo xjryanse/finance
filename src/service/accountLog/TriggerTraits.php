@@ -45,8 +45,7 @@ trait TriggerTraits{
         if (!Arrays::value($data, 'customer_id') && !Arrays::value($data, 'user_id')) {
             throw new Exception('付款客户或付款用户必须(customer_id/user_id)');
         }
-
-        Debug::debug('保存信息', $data);
+        // Debug::debug('保存信息', $data);
         $notice['account_id'] = "请选择账户";
         $notice['money'] = "金额必须";
         DataCheck::must($data, ['money', 'account_id', 'change_type'], $notice);
@@ -54,7 +53,6 @@ trait TriggerTraits{
         if (!Arrays::value($data, 'user_id') && !Arrays::value($data, 'customer_id')) {
             throw new Exception('customer_id和user_id需至少有一个参数有值');
         }
-
         $fromTable = Arrays::value($data, 'from_table');
         $fromTableId = Arrays::value($data, 'from_table_id');
         if ($fromTable) {
@@ -65,12 +63,7 @@ trait TriggerTraits{
                     throw new Exception('非待入账数据不可入账:' . $fromTable . '-' . $fromTableId);
                 }
             }
-            //customer_id
-            // 20220608尝试去除数据
-            //$data['customer_id']    = Arrays::value($data, 'customer_id') ? :Arrays::value($info, 'customer_id');
-            //$data['user_id']        = Arrays::value($data, 'user_id') ? :Arrays::value($info, 'user_id');
         }
-
         return $data;
     }
     
@@ -79,17 +72,15 @@ trait TriggerTraits{
      * 准备弃用
      */
     public static function extraAfterSave(&$data, $uuid) {
-        $customerId = Arrays::value($data, 'customer_id');  //不一定有
-        $accountId = Arrays::value($data, 'account_id');
-        $userId = Arrays::value($data, 'user_id');      //支付用户（个人）        
-        $fromTable = Arrays::value($data, 'from_table');
-        $fromTableId = Arrays::value($data, 'from_table_id');
-        $statementId = Arrays::value($data, 'statement_id'); //对账单id
-
+        $customerId     = Arrays::value($data, 'customer_id');  //不一定有
+        $accountId      = Arrays::value($data, 'account_id');
+        $userId         = Arrays::value($data, 'user_id');      //支付用户（个人）        
+        $fromTable      = Arrays::value($data, 'from_table');
+        $fromTableId    = Arrays::value($data, 'from_table_id');
+        $statementId    = Arrays::value($data, 'statement_id'); //对账单id
         if ($statementId && FinanceStatementService::getInstance($statementId)->fHasSettle()) {
             throw new Exception('账单' . $statementId . '已结算');
         }
-
         if ($fromTable) {
             $service = DbOperate::getService($fromTable);
             if ($service::mainModel()->hasField('into_account')) {
@@ -103,7 +94,6 @@ trait TriggerTraits{
             $customerMoney = self::customerMoneyCalc($customerId, $accountId);
             CustomerService::mainModel()->where('id', $customerId)->update(['pre_pay_money' => $customerMoney]);
         }
-
         //最新：更新客户的挂账款流水金额
         if ($customerId) {
             $manageAccountId = FinanceManageAccountService::customerManageAccountId($customerId);
@@ -119,11 +109,6 @@ trait TriggerTraits{
         //【对账单id】（如有关联对账单id，进行对冲结算）
         if ($statementId) {
             FinanceStatementService::getInstance($statementId)->update(['has_settle' => 1, "account_log_id" => $uuid]);
-//            //20210429添加，TODO校验影响
-//            $con    = [];
-//            $con[]  = ['statement_id','=',$statementId];
-//            FinanceStatementOrderService::mainModel()->where($con)->update(['has_settle'=>1]);
-            //$data['busier_id'] = FinanceStatementService::getInstance( $statementId )->fBusierId();
             //触发关联订单动作
             Debug::debug('FinanceAccountLogService触发关联订单动作', $statementId);
             FinanceStatementOrderService::statementIdTriggerOrderFlow($statementId);
@@ -245,12 +230,6 @@ trait TriggerTraits{
         }
         FinanceAccountService::getInstance($accountId)->updateRemainMoneyRam();
 
-        //最新：更新客户的挂账款流水金额
-//        if ($customerId) {
-//            $manageAccountId = FinanceManageAccountService::customerManageAccountId($customerId);
-//        } else {
-//            $manageAccountId = FinanceManageAccountService::userManageAccountId($userId);
-//        }
         $manageAccountId = FinanceManageAccountService::manageAccountId($customerId, $userId);
         
         $data2 = Arrays::getByKeys($data, ['money', 'user_id', 'account_id', 'change_type', 'reason']);
@@ -260,9 +239,6 @@ trait TriggerTraits{
         FinanceManageAccountLogService::saveRam($data2);
 
         //【对账单id】（如有关联对账单id，进行对冲结算）
-//        if ($statementId) {
-//            FinanceStatementService::getInstance($statementId)->updateRam(['has_settle' => 1, "account_log_id" => $uuid]);
-//        }
         self::getInstance($uuid)->statementsSettleRam($statementIds);
 
         self::afterUniSave($data);
@@ -334,7 +310,6 @@ trait TriggerTraits{
      * @return boolean|string
      */
     public static function afterUniSave($data) {
-
         DataCheck::must($data, ['account_id']);
         // 对账单id
         $statementId = Arrays::value($data, 'statement_id');
@@ -346,7 +321,6 @@ trait TriggerTraits{
         if ($dealDirection && $dealDirection != DIRECT_AFT) {
             return '';
         }
-
         $afterStatementInfos = FinanceStatementService::getInstance($statementId)->getAfterDataArr('pre_statement_id');
         foreach ($afterStatementInfos as $afterStatementInfo) {
             //20220622未结算才处理
@@ -357,7 +331,6 @@ trait TriggerTraits{
             $accountData[DIRECTION] = DIRECT_AFT;
             self::saveRam($accountData);
         }
-
         return true;
     }
     /**

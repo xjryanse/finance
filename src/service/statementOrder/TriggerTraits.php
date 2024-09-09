@@ -264,18 +264,10 @@ trait TriggerTraits {
      */
     public static function ramPreSave(&$data, $uuid) {
         $data['statement_cate'] = GoodsPrizeKeyService::keyBelongRole($data['statement_type']);
-        // dump($data);
-        // throw new Exception('调试中');
         $keys = ['statement_cate', 'statement_type'];
-        //$notices['order_id']          = '订单id必须';
-        // $notices['need_pay_prize'] = '金额必须';
         $notices['statement_cate'] = '对账分类必须';
         $notices['statement_type'] = '费用类型必须';
         DataCheck::must($data, $keys, $notices);
-
-        if(!Arrays::value($data, 'need_pay_prize') && !Arrays::value($data, 'is_un_prize')){
-           // throw new Exception('金额不能为0'); 
-        }
 
         $orderId = Arrays::value($data, 'order_id');
         $statementCate = Arrays::value($data, 'statement_cate');
@@ -284,7 +276,8 @@ trait TriggerTraits {
             $data['company_id'] = OrderService::getInstance($orderId)->fCompanyId();
         }
         //20220608:可外部传入
-        $data['statement_name'] = Arrays::value($data, 'statement_name') ?: FinanceStatementService::getStatementNameByOrderId($orderId, $data['statement_type']);
+        $data['statement_name'] = Arrays::value($data, 'statement_name') ?
+                : FinanceStatementService::getStatementNameByOrderId($orderId, $data['statement_type']);
         $needPayPrize = Arrays::value($data, 'need_pay_prize');
         if (!Arrays::value($data, 'change_type')) {
             $data['change_type'] = $needPayPrize >= 0 ? 1 : 2;
@@ -297,14 +290,13 @@ trait TriggerTraits {
                 $data['need_pay_prize'] = -1 * abs($needPayPrize); //入账，正值
             }
         }
-        Debug::debug('$statementCate后的$data', $data);
+        // Debug::debug('$statementCate后的$data', $data);
         if ($orderId) {
             //无缓存取数
             $orderInfo = OrderService::getInstance($orderId)->get();
             $data['dept_id'] = Arrays::value($orderInfo, 'dept_id');
             $data['order_type'] = Arrays::value($orderInfo, 'order_type');
             $data['busier_id'] = Arrays::value($orderInfo, 'busier_id');
-            //statementCate = "";
             //买家
             if ($statementCate == "buyer") {
                 $data['customer_id'] = Arrays::value($orderInfo, 'customer_id');
@@ -313,8 +305,12 @@ trait TriggerTraits {
             }
             //卖家
             if ($statementCate == "seller") {
-                $data['customer_id'] = isset($data['customer_id']) ? $data['customer_id'] : Arrays::value($orderInfo, 'seller_customer_id');
-                $data['user_id'] = isset($data['user_id']) ? $data['user_id'] : Arrays::value($orderInfo, 'seller_user_id');
+                $data['customer_id'] = isset($data['customer_id']) 
+                        ? $data['customer_id'] 
+                        : Arrays::value($orderInfo, 'seller_customer_id');
+                $data['user_id'] = isset($data['user_id']) 
+                        ? $data['user_id'] 
+                        : Arrays::value($orderInfo, 'seller_user_id');
                 FinanceManageAccountService::addManageAccountData($data);
             }
             //推荐人
@@ -331,16 +327,20 @@ trait TriggerTraits {
             }
         }
         //有否对账单? 1是，0否
-        $data['has_statement'] = Arrays::value($data, 'statement_id') ? 1 : 0;
-        $data['has_settle'] = Arrays::value($data, 'has_settle') ? 1 : 0;
-        $data['ref_statement_order_id'] = Arrays::value($data, 'ref_statement_order_id') ? Arrays::value($data, 'ref_statement_order_id') : '';
+        $data['has_statement']  = Arrays::value($data, 'statement_id') ? 1 : 0;
+        $data['has_settle']     = Arrays::value($data, 'has_settle') ? 1 : 0;
+        // 20240903:
+        $data['has_confirm']    = Arrays::value($data, 'has_confirm') ? 1 : 0;
+        $data['ref_statement_order_id'] = Arrays::value($data, 'ref_statement_order_id') 
+                ? Arrays::value($data, 'ref_statement_order_id') : '';
 
         $source = OrderService::getInstance($orderId)->fSource();
         //对账单分组
         $data['group'] = $source == 'admin' ? "offline" : "online";
         //后向关联保存
         //20220622:已有前序账单号，则不需要前序校验判断
-        $data['pre_statement_order_id'] = Arrays::value($data, 'pre_statement_order_id') ?: self::preUniSave($data);
+        $data['pre_statement_order_id'] = Arrays::value($data, 'pre_statement_order_id') 
+                ?: self::preUniSave($data);
         //20220622 ???
         if (!Arrays::value($data, 'customer_id') && !Arrays::value($data, 'user_id')) {
             throw new Exception('customer_id和user_id需至少有一个有值');
@@ -461,27 +461,5 @@ trait TriggerTraits {
             $service::getInstance($belongTableId)->updateFinanceRam();
         }
     }
-    
-    /**
-     * 来源表账单更新
-     */
-    /*
-    public function belongTableStatementOrderSync(){
-        // return false;
-        // 先结算，再查
-        DbOperate::dealGlobal();
 
-        $info           = $this->get();
-        $belongTable    = Arrays::value($info, 'belong_table');
-        $belongTableId  = Arrays::value($info, 'belong_table_id');
-        if(!$belongTable || !$belongTableId){
-            return true;
-        }
-        $service    = DbOperate::getService($belongTable);
-        if(method_exists($service, 'addStatementOrder')){
-            // 此方法应该 use \xjryanse\traits\FinanceSourceModelTrait;
-            $service::getInstance($belongTableId)->addStatementOrder();
-        }
-    }
-    */
 }

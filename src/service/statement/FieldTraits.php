@@ -6,7 +6,7 @@ namespace xjryanse\finance\service\statement;
  * 分页复用列表
  */
 trait FieldTraits{
-    
+
     /**
      *
      */

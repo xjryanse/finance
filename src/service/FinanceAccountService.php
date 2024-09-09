@@ -116,17 +116,14 @@ class FinanceAccountService {
      * 更新余额
      */
     public function updateRemainMoney() {
-//        $con[] = ['account_id','=',$this->uuid];
-//        $money = FinanceAccountLogService::mainModel()->where($con)->sum('money');
-//        return self::mainModel()->where('id',$this->uuid)->update(['money'=>$money]);
-        $mainTable = self::getTable();
-        $mainField = "money";
-        $dtlTable = FinanceAccountLogService::getTable();
+        $mainTable      = self::getTable();
+        $mainField      = "money";
+        $dtlTable       = FinanceAccountLogService::getTable();
         $dtlStaticField = "money";
-        $dtlUniField = "account_id";
-        $dtlCon[] = ['main.id', '=', $this->uuid];
-        $sql = Sql::staticUpdate($mainTable, $mainField, $dtlTable, $dtlStaticField, $dtlUniField, $dtlCon);
-        Debug::debug('updateRemainMoney的$sql', $sql);
+        $dtlUniField    = "account_id";
+        $dtlCon[]       = ['main.id', '=', $this->uuid];
+        $sql            = Sql::staticUpdate($mainTable, $mainField, $dtlTable, $dtlStaticField, $dtlUniField, $dtlCon);
+        // Debug::debug('updateRemainMoney的$sql', $sql);
         return Db::query($sql);
     }
 

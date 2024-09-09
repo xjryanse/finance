@@ -36,18 +36,15 @@ class FinanceAccountLogService {
 
     public static function extraDetails($ids) {
         return self::commExtraDetails($ids, function($lists) use ($ids) {
-            // $logArr = WechatWePubTemplateMsgLogService::groupBatchCount('from_table_id', $ids);
             $manageAccountLogCount = FinanceManageAccountLogService::groupBatchCount('from_table_id', $ids);            
             foreach ($lists as &$v) {
-                //模板消息数
-                // $v['wechatWePubTemplateMsgLogCount'] = Arrays::value($logArr, $v['id'], 0);
                 // 20230726 冲账记录数:0未冲账；1已冲账
                 $v['manageLogCount']  = Arrays::value($manageAccountLogCount, $v['id'], 0);
             }
             return $lists;
         },true);
     }
-
+/*
     public function delete() {
         $info = $this->get();
         if (Arrays::value($info, 'statement_id')) {
@@ -81,7 +78,7 @@ class FinanceAccountLogService {
 
         return $res;
     }
-
+*/
     /**
      * 对账单是否有收款记录
      * @param type $statementId
@@ -90,8 +87,6 @@ class FinanceAccountLogService {
     public static function statementHasLog($statementId) {
         $logs = FinanceStatementService::getInstance($statementId)->objAttrsList('financeAccountLog');
         return count($logs);
-//        $con[] = ['statement_id','=',$statementId];
-//        return self::count($con) ? self::find( $con ) : false;
     }
 
     /**

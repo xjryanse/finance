@@ -4,6 +4,9 @@ namespace xjryanse\finance\service\statement;
 
 use xjryanse\logic\Arrays;
 use Exception;
+use xjryanse\wechat\service\WechatWxPayLogService;
+use xjryanse\wechat\service\WechatWxPayRefundLogService;
+
 /**
  * 
  */
@@ -30,4 +33,25 @@ trait DoTraits{
         }
         return self::packPreGetForAccountLog($ids);
     }
+    /**
+     * 20240906：前端进行微信支付查单，一般用于开发调试
+     */
+    public function doWxPayQuery(){
+        return WechatWxPayLogService::wxPayQuery($this->uuid);
+    }
+    /**
+     * 20240906：前端进行微信退款查单，一般用于开发调试
+     * @return type
+     */
+    public function doWxRefundQuery(){
+        return WechatWxPayRefundLogService::wxRefundQuery($this->uuid);
+    }
+    /**
+     * 
+     * @return type
+     */
+    public function doWxRefundQueryByPayStatement(){
+        return WechatWxPayRefundLogService::wxRefundQueryByPayStatement($this->uuid);
+    }
+
 }

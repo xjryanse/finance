@@ -43,6 +43,7 @@ class FinanceStatementOrderService {
     use \xjryanse\finance\service\statementOrder\TriggerTraits;
     use \xjryanse\finance\service\statementOrder\CalTraits;
     use \xjryanse\finance\service\statementOrder\DoTraits;
+    use \xjryanse\finance\service\statementOrder\BuyerTraits;
 
     /**
      * 取消支付后删除对应的账单。
@@ -476,11 +477,9 @@ class FinanceStatementOrderService {
      */
     public static function statementIdTriggerOrderFlow($statementId) {
         self::checkTransaction();
-//        $con[] = ['statement_id','=',$statementId];
-//        $orderIds = self::mainModel()->where($con)->column('distinct order_id');
         $lists = FinanceStatementService::getInstance($statementId)->objAttrsList('financeStatementOrder');
         $orderIds = array_unique(array_column($lists, 'order_id'));
-        Debug::debug('FinanceStatementOrderService触发关联订单动作', $orderIds);
+        // Debug::debug('FinanceStatementOrderService触发关联订单动作', $orderIds);
         //触发动作
         foreach ($orderIds as $orderId) {
             // 20230805:增加判断：为了兼容没有orderId的情况
