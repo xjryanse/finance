@@ -3,9 +3,9 @@ namespace xjryanse\finance\logic\userPay;
 
 use xjryanse\finance\interfaces\UserPayInterface;
 use xjryanse\finance\service\FinanceStatementService;
-use xjryanse\finance\service\FinanceIncomePayService;
-use xjryanse\finance\logic\FinanceIncomePayLogic;
-use xjryanse\finance\logic\FinanceIncomeLogic;
+// use xjryanse\finance\service\FinanceIncomePayService;
+// use xjryanse\finance\logic\FinanceIncomePayLogic;
+// use xjryanse\finance\logic\FinanceIncomeLogic;
 use xjryanse\system\service\SystemCompanyService;
 use xjryanse\wechat\service\WechatWePubService;
 use xjryanse\wechat\service\WechatWxPayLogService;
@@ -47,14 +47,18 @@ class Wechat extends Base implements UserPayInterface
         $data['order_id']   = Arrays::value($incomeInfo, 'order_id');
         $data['pay_by']     = FR_FINANCE_MONEY;
         //生成支付单
-        Db::startTrans();
-        $pay = FinanceIncomePayLogic::newPay($incomeInfo['id'], $money, $incomeInfo['user_id'], $data);
-        Db::commit();
+        // 20240909:发现这是一个无用方法
+//        Db::startTrans();
+//        $pay = FinanceIncomePayLogic::newPay($incomeInfo['id'], $money, $incomeInfo['user_id'], $data);
+//        Db::commit();
+        // 20240909:调整为标记付款渠道，准备替代上一行方法
+        FinanceStatementService::getInstance( $statementId )->updateRam(['pay_by'=>'wechat']);
         //支付单
         $WxPayLogic         = new WxPayLogic($thirdPayParam['wePubAppId'], $thirdPayParam['openid'] );
         $attach             = ['statement_id'=>$incomeInfo['id']];  //收款单信息扔到附加数据
         // 20210519 改income_pay_sn 为income_id
-        $wxPayJsApiOrder    = $WxPayLogic->getWxPayJsApiOrder($pay['income_id'], $money, $incomeInfo['statement_name'],json_encode($attach));    
+        $wxPayJsApiOrder    = $WxPayLogic->getWxPayJsApiOrder($statementId, $money, $incomeInfo['statement_name'],json_encode($attach));    
+        // 20240909：感觉没用，尝试取消
         $wxPayJsApiOrder['pay_id'] = Arrays::value($pay, 'id');
         // 20230530:未支付成功时，前端有取消订单的动作。
         $wxPayJsApiOrder['order_id'] = Arrays::value($data, 'order_id');
@@ -67,6 +71,8 @@ class Wechat extends Base implements UserPayInterface
      */
     public static function afterPay( $incomePayId )
     {
+        /*
+         * 20240909:注释无用方法
         // $paySn      = FinanceIncomePayService::getInstance( $incomePayId )->fIncomePaySn();
         $info       = FinanceIncomePayService::getInstance( $incomePayId )->get();
         $wxPaySuccLog = WechatWxPayLogService::getByOutTradeNo($info['income_id']);
@@ -77,7 +83,9 @@ class Wechat extends Base implements UserPayInterface
             //收款单更新为已收款，且收款金额写入订单；
             FinanceIncomeLogic::afterPayDoIncome( $incomePayId );        
         }
-        return $incomePayId;        
+        return $incomePayId;   
+         * 
+         */     
     }
     /**
      * 退款

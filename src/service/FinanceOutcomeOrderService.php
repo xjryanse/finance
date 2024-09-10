@@ -56,7 +56,7 @@ class FinanceOutcomeOrderService {
 
 //        $data['pay_by'] = FinanceOutcomeService::getInstance($incomeId)->fieldValue('pay_by','',0);  //不拿缓存
         if (isset($data['file_id'])) {
-            FinanceIncomeService::getInstance($incomeId)->update(['file_id' => $data['file_id']]);
+            // FinanceIncomeService::getInstance($incomeId)->update(['file_id' => $data['file_id']]);
         }
 
         $orderId = $this->fOrderId();

@@ -2,14 +2,14 @@
 namespace xjryanse\finance\logic\userPay;
 
 use xjryanse\finance\interfaces\UserPayInterface;
-use xjryanse\user\logic\AccountLogic;
-use xjryanse\finance\logic\FinanceIncomeLogic;
-use xjryanse\finance\logic\FinanceIncomePayLogic;
-use xjryanse\finance\service\FinanceIncomePayService;
+//use xjryanse\user\logic\AccountLogic;
+//use xjryanse\finance\logic\FinanceIncomeLogic;
+//use xjryanse\finance\logic\FinanceIncomePayLogic;
+//use xjryanse\finance\service\FinanceIncomePayService;
 use xjryanse\user\service\UserAccountLogService;
 use xjryanse\finance\service\FinanceAccountService;
 use xjryanse\finance\service\FinanceStatementService;
-use xjryanse\finance\service\FinanceAccountLogService;
+// use xjryanse\finance\service\FinanceAccountLogService;
 use xjryanse\logic\Arrays;
 use xjryanse\logic\Debug;
 use Exception;
@@ -64,6 +64,8 @@ class Money extends Base implements UserPayInterface
      */
     public static function afterPay( $incomePayId )
     {
+        /*
+         * 20240909：注释无用方法
         $fromTable  = FinanceIncomePayService::mainModel()->getTable();
         $payLog     = UserAccountLogService::hasLog( $fromTable, $incomePayId );
         $info       = FinanceIncomePayService::getInstance( $incomePayId )->get();
@@ -77,6 +79,8 @@ class Money extends Base implements UserPayInterface
             FinanceIncomeLogic::afterPayDoIncome( $incomePayId );        
         }
         return $incomePayId;
+         * 
+         */
     }
 
     /**

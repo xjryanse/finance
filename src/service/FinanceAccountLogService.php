@@ -110,13 +110,6 @@ class FinanceAccountLogService {
             $accountIds[] = Arrays::value($logInfo, 'account_id');
         }
 
-//
-//        //statementId,取accountLog表的accountId
-//        $con1[] = ['statement_id','in',$statementId];
-//        $accountIds = self::mainModel()->where($con1)->column('distinct account_id');
-        //accountId,取类型
-        //$con2[] = ['id','in',$accountIds];
-        //$accountTypes = FinanceAccountService::mainModel()->where($con2)->column('distinct account_type');
         $accountTypes = FinanceAccountService::columnAccountTypes($accountIds);
 
         return $accountTypes ? (count($accountTypes) > 1 ? 'mix' : $accountTypes[0] ) : '';
@@ -129,9 +122,6 @@ class FinanceAccountLogService {
     public static function statementFinishMoney($statementId) {
         $logs = FinanceStatementService::getInstance($statementId)->objAttrsList('financeAccountLog');
         return array_sum(array_column($logs, 'money'));
-
-//        $con[] = ['statement_id','=',$statementId];
-//        return self::sum($con,'money');
     }
 
     /**

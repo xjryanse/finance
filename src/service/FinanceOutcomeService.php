@@ -57,7 +57,7 @@ class FinanceOutcomeService {
             FinanceOutcomeOrderService::saveGetId($data);
             //收款单
             if (isset($data['outcome_status']) && $data['outcome_status'] == XJRYANSE_OP_FINISH) {
-                FinanceIncomePayService::saveGetId($data);
+                // FinanceIncomePayService::saveGetId($data);
             }
         }
         return $res;

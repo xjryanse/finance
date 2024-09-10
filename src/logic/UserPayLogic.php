@@ -1,7 +1,7 @@
 <?php
 namespace xjryanse\finance\logic;
 
-use xjryanse\finance\service\FinanceIncomePayService;
+// use xjryanse\finance\service\FinanceIncomePayService;
 use xjryanse\finance\service\FinanceStatementService;
 use xjryanse\logic\Arrays;
 /**
@@ -34,10 +34,12 @@ class UserPayLogic
      */
     public static function afterPay( $incomePayId )
     {
+        /*
         $payBy = FinanceIncomePayService::getInstance( $incomePayId )->fPayBy();
         //动态执行各支付方式的映射类库
         $res = call_user_func([self::$baseNamespace. ucfirst($payBy), 'afterPay'] , $incomePayId );
         return $res;        
+         */
     }
     
     /**
